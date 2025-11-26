@@ -19,6 +19,18 @@ Prerequisites
 
 Quick start (POC)
 -----------------
+Option A: One-shot installer script (recommended for POC)
+--------------------------------------------------------
+1) Install prerequisites (.NET 6, Ghostscript).
+2) From an elevated PowerShell in this folder:
+   - `.\scripts\install-all.ps1 -ApiUrl "<your api>" -ApiKey "<your key>" -Company "<your company>"`
+   - Optional: `-PortNumber 9100`, `-GhostscriptPath "C:\Path\to\gswin64c.exe"`, `-StartListener`.
+3) After install, start the listener if you didn’t pass `-StartListener`:
+   - `.\scripts\run-listener.ps1`
+4) Print from any app to the `Padsign` printer.
+
+Option B: Manual setup
+----------------------
 1) Install prerequisites (.NET 6, Ghostscript).
 2) From an elevated PowerShell in this folder, create the RAW port and printer:
    - `.\scripts\install-printer.ps1 -PrinterName "Padsign" -PortNumber 9100`
