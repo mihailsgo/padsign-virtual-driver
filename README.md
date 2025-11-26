@@ -1,28 +1,21 @@
 Padsign virtual printer POC
-============================
+===========================
 
-This POC installs a virtual printer named `Padsign` that prints to a local RAW port and a small .NET helper listens on that port, captures the print job, converts it to PDF with Ghostscript, and uploads it to your API.
+This POC installs a virtual printer named `Padsign` that prints to a local RAW port. A .NET helper listens on that port, captures the print job, converts it to PDF with Ghostscript, and uploads it to your API.
 
 Architecture
 ------------
-- Windows built-in printer driver (`Microsoft PS Class Driver`) pointing at a RAW TCP port on `127.0.0.1:9100`.
+- Windows built-in printer driver pointing at a RAW TCP port on `127.0.0.1:9100`.
 - Listener (`Padsign.Listener` .NET 6 console) accepts RAW PostScript, writes a spool file, converts to PDF via `gswin64c.exe`, then POSTs the PDF to the configured API.
 - No kernel drivers or signing needed; all user-mode.
 
 Prerequisites
 -------------
 - Windows Server 2016+ (x64).
-- .NET 6 SDK or runtime (`https://dotnet.microsoft.com/en-us/download/dotnet/6.0`).
-- Ghostscript 64-bit installed (for `gswin64c.exe`) or set `GhostscriptPath` to the installed binary.
+- .NET 6 SDK or runtime (https://dotnet.microsoft.com/en-us/download/dotnet/6.0).
+- Ghostscript 64-bit installed (for `gswin64c.exe`) or supply a path in config. Download from https://ghostscript.com/releases/gsdnld.html.
 - PowerShell running as Administrator for printer setup.
 - Allow localhost inbound on the chosen RAW port (default 9100) through Windows Firewall.
-
-Prerequisites
--------------
-- Windows Server 2016+ (x64).
-- .NET 6 SDK or runtime (`https://dotnet.microsoft.com/en-us/download/dotnet/6.0`).
-- Ghostscript 64-bit installed (for `gswin64c.exe`) or supply a path in config. Download from `https://ghostscript.com/releases/gsdnld.html`.
-- PowerShell running as Administrator for printer setup.
 
 Quick start (POC)
 -----------------
@@ -51,12 +44,12 @@ What this POC does not do
 
 Files
 -----
-- `src/Padsign.Listener/` – .NET 6 console listener/uploader.
-- `config/padsign.sample.json` – configuration template.
-- `config/padsign.json` – your per-machine config (set `ApiUrl`, `ApiKey`, `Company`, optional `Port`, `GhostscriptPath`).
-- `scripts/install-printer.ps1` – adds RAW port and Padsign printer.
-- `scripts/run-listener.ps1` – builds and runs the listener.
-- `spool/` and `logs/` – created at runtime.
+- `src/Padsign.Listener/` - .NET 6 console listener/uploader.
+- `config/padsign.sample.json` - configuration template.
+- `config/padsign.json` - your per-machine config (set `ApiUrl`, `ApiKey`, `Company`, optional `Port`, `GhostscriptPath`).
+- `scripts/install-printer.ps1` - adds RAW port and Padsign printer.
+- `scripts/run-listener.ps1` - builds and runs the listener.
+- `spool/` and `logs/` - created at runtime.
 
 Operational notes
 -----------------
