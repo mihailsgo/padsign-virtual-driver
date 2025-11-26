@@ -1,0 +1,5 @@
+%!
+/Helvetica findfont 24 scalefont setfont
+72 720 moveto
+(Hello Padsign POC) show
+showpage

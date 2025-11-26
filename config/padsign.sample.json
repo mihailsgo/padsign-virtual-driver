@@ -1,0 +1,12 @@
+{
+  "ApiUrl": "https://api.example.com/upload",
+  "ApiKey": "REPLACE_WITH_API_KEY",
+  "Company": "REPLACE_WITH_COMPANY_NAME",
+  "Port": 9100,
+  "WorkingDirectory": "spool",
+  "GhostscriptPath": "gswin64c.exe",
+  "UploadTimeoutSeconds": 30,
+  "MaxUploadRetries": 3,
+  "RetryBackoffSeconds": 2,
+  "CleanupOnSuccess": false
+}

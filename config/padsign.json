@@ -1,0 +1,12 @@
+{
+  "ApiUrl": "https://httpbin.org/post",
+  "ApiKey": "demo-key",
+  "Company": "ExampleCo",
+  "Port": 9100,
+  "WorkingDirectory": "spool",
+  "GhostscriptPath": "C:\\\\Program Files\\\\gs\\\\gs10.04.0\\\\bin\\\\gswin64c.exe",
+  "UploadTimeoutSeconds": 30,
+  "MaxUploadRetries": 3,
+  "RetryBackoffSeconds": 2,
+  "CleanupOnSuccess": false
+}

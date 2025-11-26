@@ -1,0 +1,5 @@
+C:\Repos\virtual printer\out\Padsign.Listener.exe
+C:\Repos\virtual printer\out\Padsign.Listener.dll
+C:\Repos\virtual printer\out\Padsign.Listener.deps.json
+C:\Repos\virtual printer\out\Padsign.Listener.runtimeconfig.json
+C:\Repos\virtual printer\out\Padsign.Listener.pdb

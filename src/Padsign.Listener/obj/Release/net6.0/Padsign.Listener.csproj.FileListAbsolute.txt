@@ -1,0 +1,15 @@
+C:\Repos\virtual printer\src\Padsign.Listener\bin\Release\net6.0\Padsign.Listener.exe
+C:\Repos\virtual printer\src\Padsign.Listener\bin\Release\net6.0\Padsign.Listener.deps.json
+C:\Repos\virtual printer\src\Padsign.Listener\bin\Release\net6.0\Padsign.Listener.runtimeconfig.json
+C:\Repos\virtual printer\src\Padsign.Listener\bin\Release\net6.0\Padsign.Listener.dll
+C:\Repos\virtual printer\src\Padsign.Listener\bin\Release\net6.0\Padsign.Listener.pdb
+C:\Repos\virtual printer\src\Padsign.Listener\obj\Release\net6.0\Padsign.Listener.csproj.AssemblyReference.cache
+C:\Repos\virtual printer\src\Padsign.Listener\obj\Release\net6.0\Padsign.Listener.GeneratedMSBuildEditorConfig.editorconfig
+C:\Repos\virtual printer\src\Padsign.Listener\obj\Release\net6.0\Padsign.Listener.AssemblyInfoInputs.cache
+C:\Repos\virtual printer\src\Padsign.Listener\obj\Release\net6.0\Padsign.Listener.AssemblyInfo.cs
+C:\Repos\virtual printer\src\Padsign.Listener\obj\Release\net6.0\Padsign.Listener.csproj.CoreCompileInputs.cache
+C:\Repos\virtual printer\src\Padsign.Listener\obj\Release\net6.0\Padsign.Listener.dll
+C:\Repos\virtual printer\src\Padsign.Listener\obj\Release\net6.0\refint\Padsign.Listener.dll
+C:\Repos\virtual printer\src\Padsign.Listener\obj\Release\net6.0\Padsign.Listener.pdb
+C:\Repos\virtual printer\src\Padsign.Listener\obj\Release\net6.0\Padsign.Listener.genruntimeconfig.cache
+C:\Repos\virtual printer\src\Padsign.Listener\obj\Release\net6.0\ref\Padsign.Listener.dll
