@@ -12,7 +12,11 @@ Quick Installation Guide
 3. In installer options:
    - choose installation folder
    - choose whether to create desktop shortcut
-4. After install, open `Padsign Manager`.
+4. After install, open `Padsign Manager` from desktop shortcut, or run executable directly:
+   - default full path:
+     - `C:\Program Files\Padsign\manager\Padsign.Manager.exe`
+   - if custom install folder was selected:
+     - `<YourInstallFolder>\manager\Padsign.Manager.exe`
 5. In `Setup` tab, fill required fields and click `Save And Test PDF Sending`.
 6. In `Operations` tab, click `Start Listener`.
 7. Print to the `Padsign` printer.
@@ -138,6 +142,10 @@ Install and First Run (Client)
    - choose installation folder
    - choose whether to create desktop shortcut
 3. App opens `Padsign Manager`.
+   - direct executable path (default):
+     - `C:\Program Files\Padsign\manager\Padsign.Manager.exe`
+   - listener executable path (default):
+     - `C:\Program Files\Padsign\listener\Padsign.Listener.exe`
 4. In `Setup` tab fill:
    - `ApiUrl`
    - `Authentication Header Name`
