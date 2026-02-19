@@ -103,9 +103,16 @@ Use these names for client screenshots in this README:
 
 When image files are added, include:
 
+### Setup Tab
 ![Setup Tab](docs/images/setup-tab.png)
+
+### Operations Tab
 ![Operations Tab](docs/images/operations-tab.png)
+
+### Monitoring Tab
 ![Monitoring Tab](docs/images/monitoring-tab.png)
+
+### Help Window
 ![Help Window](docs/images/help-window.png)
 
 Install and First Run (Client)
