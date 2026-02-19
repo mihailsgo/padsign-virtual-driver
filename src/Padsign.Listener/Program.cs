@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Sockets;
@@ -62,11 +61,13 @@ internal static class Program
 internal sealed record PadsignConfig
 {
     public string ApiUrl { get; init; } = string.Empty;
+    public string AuthenticationHeaderName { get; init; } = "Authorization";
+    public string AuthenticationHeaderValue { get; init; } = string.Empty;
     public string ApiKey { get; init; } = string.Empty;
+    public string Email { get; init; } = string.Empty;
     public string Company { get; init; } = string.Empty;
     public int Port { get; init; } = 9100;
     public string WorkingDirectory { get; init; } = "spool";
-    public string GhostscriptPath { get; init; } = "gswin64c.exe";
     public int UploadTimeoutSeconds { get; init; } = 30;
     public int MaxUploadRetries { get; init; } = 3;
     public int RetryBackoffSeconds { get; init; } = 2;
@@ -86,10 +87,21 @@ internal sealed record PadsignConfig
             throw new InvalidOperationException("Could not deserialize config");
         if (string.IsNullOrWhiteSpace(cfg.ApiUrl))
             throw new InvalidOperationException("ApiUrl missing in config");
-        if (string.IsNullOrWhiteSpace(cfg.ApiKey))
-            throw new InvalidOperationException("ApiKey missing in config");
+        var authHeaderValue = cfg.AuthenticationHeaderValue;
+        if (string.IsNullOrWhiteSpace(authHeaderValue) && !string.IsNullOrWhiteSpace(cfg.ApiKey))
+            authHeaderValue = $"Bearer {cfg.ApiKey}";
+        if (string.IsNullOrWhiteSpace(authHeaderValue))
+            throw new InvalidOperationException("AuthenticationHeaderValue missing in config");
+        if (string.IsNullOrWhiteSpace(cfg.Email))
+            throw new InvalidOperationException("Email missing in config");
+        if (string.IsNullOrWhiteSpace(cfg.Company))
+            throw new InvalidOperationException("Company missing in config");
         return cfg with
         {
+            AuthenticationHeaderName = string.IsNullOrWhiteSpace(cfg.AuthenticationHeaderName) ? "Authorization" : cfg.AuthenticationHeaderName.Trim(),
+            AuthenticationHeaderValue = authHeaderValue.Trim(),
+            Email = cfg.Email.Trim(),
+            Company = cfg.Company.Trim(),
             WorkingDirectory = ResolvePath(cfg.WorkingDirectory, AppContext.BaseDirectory)
         };
     }
@@ -172,7 +184,6 @@ internal sealed class JobProcessor
     public async Task ProcessAsync(Stream inputStream, string jobId, CancellationToken cancellationToken)
     {
         var spoolPath = Path.Combine(_config.WorkingDirectory, $"job-{jobId}.prn");
-        var pdfPath = Path.ChangeExtension(spoolPath, ".pdf");
 
         long bytes;
         await using (var file = File.Create(spoolPath))
@@ -181,21 +192,21 @@ internal sealed class JobProcessor
         }
 
         _logger.Info($"Job {jobId}: received {bytes} bytes to {spoolPath}");
+        if (bytes == 0)
+            throw new InvalidOperationException($"Job {jobId}: empty print payload");
 
         var format = DetectFormat(spoolPath);
         _logger.Info($"Job {jobId}: detected format {format}");
 
-        if (format == JobFormat.Pdf)
+        if (format != JobFormat.Pdf)
         {
-            File.Copy(spoolPath, pdfPath, overwrite: true);
-            _logger.Info($"Job {jobId}: input already PDF, skipping conversion.");
+            _logger.Error($"Job {jobId}: document is not PDF. Upload request has not been made.");
+            return;
         }
-        else
-        {
-            var converted = await ConvertToPdfAsync(spoolPath, pdfPath, jobId, cancellationToken);
-            if (!converted)
-                throw new InvalidOperationException($"Job {jobId}: conversion failed");
-        }
+
+        var pdfPath = Path.ChangeExtension(spoolPath, ".pdf");
+        File.Copy(spoolPath, pdfPath, overwrite: true);
+        _logger.Info($"Job {jobId}: input already PDF, upload request will be sent.");
 
         await UploadWithRetryAsync(pdfPath, jobId, cancellationToken);
 
@@ -206,64 +217,20 @@ internal sealed class JobProcessor
         }
     }
 
-    private async Task<bool> ConvertToPdfAsync(string inputPath, string outputPath, string jobId, CancellationToken cancellationToken)
-    {
-        var gs = string.IsNullOrWhiteSpace(_config.GhostscriptPath) ? "gswin64c.exe" : _config.GhostscriptPath;
-        var args = $"-dBATCH -dNOPAUSE -sDEVICE=pdfwrite -dSAFER -sOutputFile=\"{outputPath}\" \"{inputPath}\"";
-
-        var psi = new ProcessStartInfo
-        {
-            FileName = gs,
-            Arguments = args,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
-
-        _logger.Info($"Job {jobId}: converting via Ghostscript -> {outputPath}");
-
-        using var proc = Process.Start(psi);
-        if (proc == null)
-        {
-            _logger.Error($"Job {jobId}: failed to start Ghostscript at '{gs}'");
-            return false;
-        }
-
-        var stdoutTask = proc.StandardOutput.ReadToEndAsync();
-        var stderrTask = proc.StandardError.ReadToEndAsync();
-
-        await proc.WaitForExitAsync(cancellationToken);
-        var stdout = await stdoutTask;
-        var stderr = await stderrTask;
-
-        if (proc.ExitCode != 0)
-        {
-            _logger.Error($"Job {jobId}: Ghostscript failed (code {proc.ExitCode}) stderr: {stderr}");
-            return false;
-        }
-
-        _logger.Info($"Job {jobId}: conversion ok, output size {new FileInfo(outputPath).Length} bytes");
-        if (!string.IsNullOrWhiteSpace(stdout))
-            _logger.Debug($"Ghostscript stdout: {stdout.Trim()}");
-        if (!string.IsNullOrWhiteSpace(stderr))
-            _logger.Debug($"Ghostscript stderr: {stderr.Trim()}");
-        return true;
-    }
-
     private async Task UploadWithRetryAsync(string pdfPath, string jobId, CancellationToken cancellationToken)
     {
+        var sessionCombo = $"{_config.Email}|{_config.Company}";
         for (var attempt = 1; attempt <= Math.Max(_config.MaxUploadRetries, 1); attempt++)
         {
             try
             {
                 await UploadOnceAsync(pdfPath, jobId, cancellationToken);
-                _logger.Info($"Job {jobId}: upload successful.");
+                _logger.Info($"Job {jobId}: upload successful for session {sessionCombo}.");
                 return;
             }
             catch (Exception ex)
             {
-                _logger.Error($"Job {jobId}: upload attempt {attempt} failed: {ex.Message}");
+                _logger.Error($"Job {jobId}: upload attempt {attempt} failed for session {sessionCombo}: {ex.Message}");
                 if (attempt == _config.MaxUploadRetries)
                     throw;
 
@@ -281,8 +248,7 @@ internal sealed class JobProcessor
             Timeout = TimeSpan.FromSeconds(_config.UploadTimeoutSeconds)
         };
 
-        if (!string.IsNullOrWhiteSpace(_config.ApiKey))
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _config.ApiKey);
+        SetAuthenticationHeader(client, _config.AuthenticationHeaderName, _config.AuthenticationHeaderValue);
 
         await using var fileStream = File.OpenRead(pdfPath);
         using var content = new MultipartFormDataContent();
@@ -291,13 +257,10 @@ internal sealed class JobProcessor
         pdfContent.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
 
         content.Add(pdfContent, "file", fileName);
-        content.Add(new StringContent(Environment.UserName), "user");
-        content.Add(new StringContent(Environment.MachineName), "machine");
-        if (!string.IsNullOrWhiteSpace(_config.Company))
-            content.Add(new StringContent(_config.Company), "company");
-        content.Add(new StringContent(jobId), "jobId");
+        content.Add(new StringContent(_config.Email), "email");
+        content.Add(new StringContent(_config.Company), "company");
 
-        _logger.Info($"Job {jobId}: uploading {fileName} to {_config.ApiUrl}");
+        _logger.Info($"Job {jobId}: uploading {fileName} to {_config.ApiUrl} for session {_config.Email}|{_config.Company}");
 
         var response = await client.PostAsync(_config.ApiUrl, content, cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -326,6 +289,24 @@ internal sealed class JobProcessor
     private static string Truncate(string value, int max) =>
         string.IsNullOrEmpty(value) || value.Length <= max ? value : value[..max] + "...";
 
+    private static void SetAuthenticationHeader(HttpClient client, string headerName, string headerValue)
+    {
+        if (string.IsNullOrWhiteSpace(headerName) || string.IsNullOrWhiteSpace(headerValue))
+            return;
+
+        if (headerName.Equals("Authorization", StringComparison.OrdinalIgnoreCase))
+        {
+            if (AuthenticationHeaderValue.TryParse(headerValue, out var authValue))
+            {
+                client.DefaultRequestHeaders.Authorization = authValue;
+                return;
+            }
+            throw new InvalidOperationException("AuthenticationHeaderValue is not a valid Authorization header value.");
+        }
+
+        client.DefaultRequestHeaders.TryAddWithoutValidation(headerName, headerValue);
+    }
+
     private static JobFormat DetectFormat(string path)
     {
         try
@@ -336,6 +317,8 @@ internal sealed class JobProcessor
             var header = Encoding.ASCII.GetString(buffer, 0, read);
             if (header.StartsWith("%PDF-", StringComparison.OrdinalIgnoreCase))
                 return JobFormat.Pdf;
+            if (header.StartsWith("%!", StringComparison.OrdinalIgnoreCase))
+                return JobFormat.PostScript;
             if (header.StartsWith("%!PS", StringComparison.OrdinalIgnoreCase))
                 return JobFormat.PostScript;
             return JobFormat.Unknown;

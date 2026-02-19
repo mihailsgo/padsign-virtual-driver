@@ -1,0 +1,363 @@
+<Window x:Class="Padsign.Manager.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Padsign Manager"
+        Icon="Assets/trustlynx.ico"
+        Width="1100"
+        Height="760"
+        MinWidth="980"
+        MinHeight="680"
+        Background="#FFF3F5F8"
+        WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <Style TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Bahnschrift" />
+            <Setter Property="Foreground" Value="#FF152235" />
+        </Style>
+        <Style x:Key="ErrorTextStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Bahnschrift" />
+            <Setter Property="Foreground" Value="#FFB42318" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Margin" Value="0,-8,0,10" />
+            <Setter Property="Visibility" Value="Collapsed" />
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="FontFamily" Value="Bahnschrift" />
+            <Setter Property="Margin" Value="0,6,0,14" />
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="#FFD0D8E2" />
+            <Setter Property="Background" Value="White" />
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="FontFamily" Value="Bahnschrift" />
+            <Setter Property="Padding" Value="14,8" />
+            <Setter Property="Margin" Value="0,0,8,8" />
+            <Setter Property="Background" Value="#FF0F5AA3" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderBrush" Value="#FF0F5AA3" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"
+                                              RecognizesAccessKey="True" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#FF0C4B88" />
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#FF0C4B88" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#FF093A6A" />
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#FF093A6A" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#FFB7C3D1" />
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#FFB7C3D1" />
+                                <Setter Property="Foreground" Value="#FF5B6675" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="14" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="White" CornerRadius="12" Padding="18" BorderBrush="#FFE0E6ED" BorderThickness="1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Image Source="Assets/padsign-logo.png"
+                           Width="52"
+                           Height="52"
+                           Margin="0,0,12,0"
+                           Stretch="Uniform" />
+                    <StackPanel>
+                        <TextBlock Text="Padsign Manager" FontSize="30" FontWeight="Bold" />
+                        <TextBlock Text="Configure and operate the virtual printer client" FontSize="14" Foreground="#FF516071" />
+                    </StackPanel>
+                </StackPanel>
+
+                <Border Grid.Column="1" Margin="20,0,8,0" Padding="10,6" CornerRadius="14" Background="#FFEAF6EE" BorderBrush="#FFB5DFC3" BorderThickness="1">
+                    <TextBlock Name="ConfigStatusChipText"
+                               Text="Config: Unknown"
+                               FontWeight="SemiBold"
+                               Foreground="#FF165A2D"
+                               VerticalAlignment="Center" />
+                </Border>
+                <Border Grid.Column="2" Margin="0,0,8,0" Padding="10,6" CornerRadius="14" Background="#FFFDF3E8" BorderBrush="#FFF1D4AE" BorderThickness="1">
+                    <TextBlock Name="ListenerStatusChipText"
+                               Text="Listener: Stopped"
+                               FontWeight="SemiBold"
+                               Foreground="#FF8A4F12"
+                               VerticalAlignment="Center" />
+                </Border>
+                <Border Grid.Column="3" Padding="10,6" CornerRadius="14" Background="#FFEAF0FF" BorderBrush="#FFC5D5FF" BorderThickness="1">
+                    <TextBlock Name="PrinterStatusChipText"
+                               Text="Printer: Unknown"
+                               FontWeight="SemiBold"
+                               Foreground="#FF173F8A"
+                               VerticalAlignment="Center" />
+                </Border>
+                <Button Grid.Column="4"
+                        Content="?"
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center"
+                        Width="32"
+                        Height="32"
+                        Padding="0"
+                        FontSize="18"
+                        FontWeight="Bold"
+                        ToolTip="Help"
+                        Click="HelpButton_Click" />
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="2" Background="White" CornerRadius="12" Padding="12" BorderBrush="#FFE0E6ED" BorderThickness="1">
+            <TabControl Name="MainTabs" Background="Transparent" BorderThickness="0">
+                <TabItem Header="Setup">
+                    <Grid Margin="16">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="20" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="API URL" FontWeight="SemiBold" />
+                                    <TextBox Name="ApiUrlTextBox" TextChanged="FormFieldChanged" />
+                                    <TextBlock Name="ApiUrlErrorTextBlock" Style="{StaticResource ErrorTextStyle}" />
+
+                                    <TextBlock Text="Authentication Header Name" FontWeight="SemiBold" />
+                                    <TextBox Name="AuthHeaderNameTextBox" TextChanged="FormFieldChanged" />
+                                    <TextBlock Name="AuthHeaderNameErrorTextBlock" Style="{StaticResource ErrorTextStyle}" />
+
+                                    <TextBlock Text="Authentication Header Value" FontWeight="SemiBold" />
+                                    <Grid Margin="0,6,0,14">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid>
+                                            <PasswordBox Name="AuthHeaderValuePasswordBox"
+                                                         Padding="10,7"
+                                                         BorderThickness="1"
+                                                         BorderBrush="#FFD0D8E2"
+                                                         Background="White"
+                                                         Visibility="Collapsed"
+                                                         PasswordChanged="AuthHeaderValuePasswordBox_PasswordChanged" />
+                                            <TextBox Name="AuthHeaderValueVisibleTextBox"
+                                                     Visibility="Visible"
+                                                     Margin="0"
+                                                     TextChanged="AuthHeaderValueVisibleTextBox_TextChanged" />
+                                        </Grid>
+                                        <CheckBox Grid.Column="1"
+                                                  Name="ShowAuthHeaderValueCheckBox"
+                                                  Margin="8,0,8,0"
+                                                  VerticalAlignment="Center"
+                                                  Content="Show"
+                                                  FontFamily="Bahnschrift"
+                                                  IsChecked="True"
+                                                  Checked="ShowAuthHeaderValueCheckBox_Checked"
+                                                  Unchecked="ShowAuthHeaderValueCheckBox_Unchecked" />
+                                        <Button Grid.Column="2"
+                                                Content="Copy"
+                                                Margin="0"
+                                                Padding="12,7"
+                                                Click="CopyAuthHeaderValueButton_Click" />
+                                    </Grid>
+                                    <TextBlock Name="AuthHeaderValueErrorTextBlock" Style="{StaticResource ErrorTextStyle}" />
+
+                                    <TextBlock Text="Email" FontWeight="SemiBold" />
+                                    <TextBox Name="EmailTextBox" TextChanged="FormFieldChanged" />
+                                    <TextBlock Name="EmailErrorTextBlock" Style="{StaticResource ErrorTextStyle}" />
+
+                                    <TextBlock Text="Company" FontWeight="SemiBold" />
+                                    <TextBox Name="CompanyTextBox" TextChanged="FormFieldChanged" />
+                                    <TextBlock Name="CompanyErrorTextBlock" Style="{StaticResource ErrorTextStyle}" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="RAW Port" FontWeight="SemiBold" />
+                                    <TextBox Name="PortTextBox" TextChanged="FormFieldChanged" />
+                                    <TextBlock Name="PortErrorTextBlock" Style="{StaticResource ErrorTextStyle}" />
+
+                                    <TextBlock Text="Working Directory" FontWeight="SemiBold" />
+                                    <TextBox Name="WorkingDirectoryTextBox" TextChanged="FormFieldChanged" />
+
+                                    <TextBlock Text="Upload Timeout Seconds" FontWeight="SemiBold" />
+                                    <TextBox Name="UploadTimeoutTextBox" TextChanged="FormFieldChanged" />
+                                    <TextBlock Name="UploadTimeoutErrorTextBlock" Style="{StaticResource ErrorTextStyle}" />
+
+                                    <TextBlock Text="Max Upload Retries" FontWeight="SemiBold" />
+                                    <TextBox Name="MaxRetriesTextBox" TextChanged="FormFieldChanged" />
+                                    <TextBlock Name="MaxRetriesErrorTextBlock" Style="{StaticResource ErrorTextStyle}" />
+
+                                    <TextBlock Text="Retry Backoff Seconds" FontWeight="SemiBold" />
+                                    <TextBox Name="RetryBackoffTextBox" TextChanged="FormFieldChanged" />
+                                    <TextBlock Name="RetryBackoffErrorTextBlock" Style="{StaticResource ErrorTextStyle}" />
+
+                                    <CheckBox Name="CleanupOnSuccessCheckBox" Content="Cleanup spool files after successful upload" Margin="0,8,0,0" FontFamily="Bahnschrift" Checked="FormFieldChanged" Unchecked="FormFieldChanged" />
+                                </StackPanel>
+                            </Grid>
+                        </ScrollViewer>
+
+                        <WrapPanel Grid.Row="1" Margin="0,10,0,0">
+                            <Button Name="SaveAndTestButton" Content="Save And Test PDF Sending" Click="SaveAndTestButton_Click" />
+                            <Button Name="RemovePdfButton" Content="Remove PDF" Click="RemovePdfButton_Click" />
+                            <TextBlock Name="ConfigSaveStateTextBlock" VerticalAlignment="Center" Margin="8,0,0,8" FontWeight="SemiBold" Foreground="#FF8A4F12" />
+                            <TextBlock Name="LastTestUploadStateTextBlock" VerticalAlignment="Center" Margin="8,0,0,8" FontWeight="SemiBold" Foreground="#FF8A4F12" />
+                        </WrapPanel>
+                    </Grid>
+                </TabItem>
+
+                <TabItem Header="Operations">
+                    <ScrollViewer Margin="16" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel>
+                            <Border Background="#FFF8FAFD" BorderBrush="#FFE3E9F1" BorderThickness="1" CornerRadius="10" Padding="14">
+                                <StackPanel>
+                                    <TextBlock Text="Environment" FontSize="18" FontWeight="SemiBold" />
+                                    <TextBlock Name="RootPathTextBlock" Margin="0,8,0,0" TextWrapping="Wrap" />
+                                    <TextBlock Name="ConfigPathTextBlock" Margin="0,4,0,0" TextWrapping="Wrap" />
+                                    <TextBlock Name="ListenerPathTextBlock" Margin="0,4,0,0" TextWrapping="Wrap" />
+                                    <TextBlock Name="LogPathTextBlock" Margin="0,4,0,0" TextWrapping="Wrap" />
+                                    <Separator Margin="0,10,0,8" />
+                                    <TextBlock Text="Readiness Checklist" FontSize="16" FontWeight="SemiBold" />
+                                    <TextBlock Name="ReadyConfigTextBlock" Margin="0,8,0,0" />
+                                    <TextBlock Name="ReadyPrinterTextBlock" Margin="0,3,0,0" />
+                                    <TextBlock Name="ReadyListenerTextBlock" Margin="0,3,0,0" />
+                                    <TextBlock Name="ReadyTestUploadTextBlock" Margin="0,3,0,0" />
+                                    <TextBlock Name="ReadyOverallTextBlock" Margin="0,8,0,0" FontWeight="Bold" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Margin="0,12,0,0" Background="#FFF8FAFD" BorderBrush="#FFE3E9F1" BorderThickness="1" CornerRadius="10" Padding="14">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Text="Actions" FontSize="18" FontWeight="SemiBold" />
+                                    <WrapPanel Grid.Column="0" Margin="0,38,0,0">
+                                        <Button Name="InstallPrinterButton" Content="Install Printer (Admin)" Click="InstallPrinterButton_Click" />
+                                        <Button Name="ToggleListenerButton" Content="Start Listener" Click="ToggleListenerButton_Click" />
+                                    </WrapPanel>
+
+                                    <Button Grid.Column="1"
+                                            Name="RemovePrinterButton"
+                                            Content="! Remove Printer (Risky)"
+                                            Click="RemovePrinterButton_Click"
+                                            Margin="8,38,0,0"
+                                            VerticalAlignment="Top"
+                                            Background="#FFD92D20"
+                                            BorderBrush="#FFD92D20" />
+                                </Grid>
+                            </Border>
+
+                            <Border Margin="0,12,0,0" Name="OperationResultCard" Background="#FFEAF0FF" BorderBrush="#FFC5D5FF" BorderThickness="1" CornerRadius="10" Padding="12">
+                                <StackPanel>
+                                    <TextBlock Name="OperationResultTitleTextBlock" Text="Last Operation: None" FontSize="16" FontWeight="SemiBold" />
+                                    <TextBlock Name="OperationResultTimeTextBlock" Margin="0,4,0,0" Foreground="#FF415970" />
+                                    <TextBlock Name="OperationResultMessageTextBlock" Margin="0,8,0,0" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Margin="0,12,0,0" Background="#FFF8FAFD" BorderBrush="#FFE3E9F1" BorderThickness="1" CornerRadius="10" Padding="14">
+                                <StackPanel>
+                                    <TextBlock Text="Command Output" FontSize="18" FontWeight="SemiBold" />
+                                    <TextBox Name="CommandOutputTextBox"
+                                             Margin="0,10,0,0"
+                                             Height="230"
+                                             TextWrapping="Wrap"
+                                             VerticalScrollBarVisibility="Auto"
+                                             IsReadOnly="True"
+                                             FontFamily="Consolas"
+                                             Background="#FF0E1722"
+                                             Foreground="#FFE3EDF9"
+                                             BorderBrush="#FF0E1722" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <TabItem Name="MonitoringTab" Header="Monitoring">
+                    <Grid Margin="16">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="10" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <WrapPanel>
+                            <Button Content="Refresh Log" Click="RefreshLogButton_Click" />
+                            <Button Content="Copy Log" Click="CopyLogButton_Click" />
+                            <Button Content="Clear Output" Click="ClearOutputButton_Click" />
+                        </WrapPanel>
+
+                        <TextBox Grid.Row="2"
+                                 Name="LogTailTextBox"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 IsReadOnly="True"
+                                 FontFamily="Consolas"
+                                 Background="#FF121A24"
+                                 Foreground="#FFE9F1FD"
+                                 BorderBrush="#FF121A24" />
+                    </Grid>
+                </TabItem>
+            </TabControl>
+        </Border>
+
+        <Border Grid.Row="3" Margin="0,12,0,0" Background="#FFF4F7FB" BorderBrush="#FFDEE6F0" BorderThickness="1" CornerRadius="8" Padding="10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Name="StatusTextBlock" Text="Ready." VerticalAlignment="Center" />
+
+                <TextBlock Grid.Column="1" VerticalAlignment="Center">
+                    <Run Text="Developed by " />
+                    <Hyperlink NavigateUri="https://trustlynx.com"
+                               RequestNavigate="TrustlynxLink_RequestNavigate">TrustLynx</Hyperlink>
+                    <Run Name="FooterYearRun" Text=", 2026" />
+                </TextBlock>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

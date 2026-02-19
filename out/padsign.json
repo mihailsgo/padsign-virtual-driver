@@ -1,6 +1,9 @@
 {
-  "ApiUrl": "https://httpbin.org/post",
-  "ApiKey": "demo-key",
+  "ApiUrl": "https://padsign.trustlynx.com/api/registerPDF",
+  "AuthenticationHeaderName": "Authorization",
+  "AuthenticationHeaderValue": "Bearer tlx_pdf_8f7e2a1b9c4d6e3f5a8b2c7d9e1f4a6b8c3d5e7f9a2b4c6d8e0f1a3b5c7d9e2f4",
+  "Email": "mihails.gordijenko@gmail.com",
+  "Company": "Adenta",
   "Port": 9100,
   "WorkingDirectory": "spool",
   "GhostscriptPath": "C:\\\\Program Files\\\\gs\\\\gs10.04.0\\\\bin\\\\gswin64c.exe",

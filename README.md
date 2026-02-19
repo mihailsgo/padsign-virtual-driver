@@ -1,78 +1,206 @@
-Padsign virtual printer POC
-===========================
+Padsign Virtual Printer Client
+==============================
 
-This POC installs a virtual printer named `Padsign` that prints to a local RAW port. A .NET helper listens on that port, captures the print job, converts it to PDF with Ghostscript, and uploads it to your API.
+This solution installs a virtual printer named `Padsign` on Windows and uploads print jobs to Padsign API when the incoming print payload is already a PDF.
 
-Architecture
-------------
-- Windows built-in printer driver pointing at a RAW TCP port on `127.0.0.1:9100`.
-- Listener (`Padsign.Listener` .NET 6 console) accepts RAW PostScript, writes a spool file, converts to PDF via `gswin64c.exe`, then POSTs the PDF to the configured API.
-- No kernel drivers or signing needed; all user-mode.
+No manual config-file editing is required for end users. All operational fields are editable in the desktop app (`Padsign Manager`).
 
-Prerequisites
--------------
-- Windows Server 2016+ (x64).
-- .NET 6 SDK or runtime (https://dotnet.microsoft.com/en-us/download/dotnet/6.0).
-- Ghostscript 64-bit installed (for `gswin64c.exe`) or supply a path in config. Download from https://ghostscript.com/releases/gsdnld.html.
-- PowerShell running as Administrator for printer setup.
-- Allow localhost inbound on the chosen RAW port (default 9100) through Windows Firewall.
+Visual Architecture
+-------------------
+```mermaid
+flowchart LR
+  A[User prints to Padsign printer] --> B[RAW port 127.0.0.1:9100]
+  B --> C[Padsign.Listener]
+  C --> D{Payload is PDF?}
+  D -- Yes --> E[POST /api/registerPDF with file + email + company]
+  D -- No --> F[Log: document is not PDF; upload not sent]
+```
 
-Quick start (POC)
------------------
-Option A: One-shot installer script (recommended for POC)
---------------------------------------------------------
-1) Install prerequisites (.NET 6, Ghostscript).
-2) From an elevated PowerShell in this folder:
-   - `.\scripts\install-all.ps1 -ApiUrl "<your api>" -ApiKey "<your key>" -Company "<your company>"`
-   - Optional: `-PortNumber 9100`, `-GhostscriptPath "C:\Path\to\gswin64c.exe"`, `-StartListener`.
-3) After install, start the listener if you didn't pass `-StartListener`:
-   - `.\scripts\run-listener.ps1`
-4) Print from any app to the `Padsign` printer.
-
-Option B: Manual setup
-----------------------
-1) Install prerequisites (.NET 6, Ghostscript).
-2) From an elevated PowerShell in this folder, create the RAW port and printer:
-   - `.\scripts\install-printer.ps1 -PrinterName "Padsign" -PortNumber 9100`
-3) Configure API endpoint, key, and company:
-   - Copy `config\padsign.sample.json` to `config\padsign.json`.
-   - Set `ApiUrl`, `ApiKey`, and `Company` (use a per-customer or per-site value).
-   - Optional: adjust `Port` (must match printer port) and `GhostscriptPath` if not on PATH.
-4) Build and run the listener (keeps console open, publishes to `out/`):
-   - `.\scripts\run-listener.ps1`
-5) Print from any app to the `Padsign` printer. The listener will:
-   - receive the job on port 9100,
-   - save `spool\*.ps`,
-   - convert to `spool\*.pdf` via Ghostscript,
-   - upload to your API (multipart/form-data) with basic metadata,
-   - log to `logs\padsign.log`.
-
-What this POC does not do
+UI Map (What Client Sees)
 -------------------------
-- No installer/uninstaller beyond the helper scripts.
-- No Windows Service wrapper (run as console for now).
-- Minimal metadata extraction; it does not parse PJL/print ticket for document names.
-- No retry persistence across reboots; retries occur only in-memory per job.
+- Header chips:
+  - `Config: ...`
+  - `Listener: Running/Stopped`
+  - `Printer: Installed/Missing`
+- Tabs:
+  - `Setup`: fill API/auth/session values and click `Save And Test PDF Sending`.
+  - `Operations`: install/remove printer, start/stop listener, readiness checklist, command output.
+  - `Monitoring`: live log tail, copy log, clear output.
+- Help:
+  - `?` button in top-right opens built-in troubleshooting guide.
 
-Files
------
-- `src/Padsign.Listener/` - .NET 6 console listener/uploader.
-- `config/padsign.sample.json` - configuration template.
-- `config/padsign.json` - your per-machine config (set `ApiUrl`, `ApiKey`, `Company`, optional `Port`, `GhostscriptPath`).
-- `scripts/install-printer.ps1` - adds RAW port and Padsign printer.
-- `scripts/run-listener.ps1` - builds and runs the listener.
-- `spool/` and `logs/` - created at runtime.
+Detailed Tab Guide
+------------------
+Setup Tab
+- Purpose:
+  - configure API/auth/session values and verify upload before starting listener.
+- Left-side fields:
+  - `API URL`
+  - `Authentication Header Name`
+  - `Authentication Header Value` with `Show` checkbox and `Copy` button
+  - `Email`
+  - `Company`
+- Right-side fields:
+  - `RAW Port`
+  - `Working Directory`
+  - `Upload Timeout Seconds`
+  - `Max Upload Retries`
+  - `Retry Backoff Seconds`
+  - `Cleanup spool files after successful upload`
+- Actions:
+  - `Save And Test PDF Sending`:
+    - validates input
+    - persists configuration
+    - sends a test PDF upload with current `email + company`
+    - returns friendly error category plus technical details on failure
+  - `Remove PDF`:
+    - calls remove-user endpoint for current `email + company`
+- Setup status texts:
+  - save state (`Unsaved changes` or `Saved`)
+  - last upload test state (`success/failed/not run`)
 
-Operational notes
------------------
-- Default port is `9100` (HP JetDirect style). Keep `run-listener.ps1` and `install-printer.ps1` in sync if you change it.
-- Ensure Windows Firewall allows inbound TCP on the chosen port (localhost only by default).
-- Ghostscript path defaults to `gswin64c.exe` on PATH; override in `padsign.json` if installed elsewhere.
-- The listener exits non-zero if upload or conversion fails; check `logs/padsign.log` for errors.
+Operations Tab
+- Purpose:
+  - runtime control plane for printer/listener and operational checks.
+- Environment card:
+  - shows resolved paths for root, config, listener executable, and log file.
+- Readiness checklist:
+  - config is valid and saved
+  - printer is installed
+  - listener process is running
+  - API test upload has succeeded
+- Actions section:
+  - `Install Printer (Admin)`:
+    - creates/repairs local Padsign printer and RAW TCP port
+  - `Start Listener` / `Stop Listener`:
+    - one toggle button depending on current state
+  - `! Remove Printer (Risky)`:
+    - removes local Padsign printer after confirmation
+- Diagnostics panels:
+  - `Last Operation` card summarizes latest command/action result
+  - `Command Output` shows command/API diagnostics details
 
-Next steps if you want to harden
---------------------------------
-- Run the listener as a Windows Service with automatic restart.
-- Add durable queueing for offline/failed uploads.
-- Parse PJL/job ticket for document names/user info.
-- Sign and package via MSIX/WiX.
+Monitoring Tab
+- Purpose:
+  - real-time log visibility and support diagnostics.
+- Behavior:
+  - auto-refreshes while Monitoring tab is open
+  - shows listener log tail in a console-style panel
+- Actions:
+  - `Refresh Log`
+  - `Copy Log`
+  - `Clear Output`
+- Recommended usage:
+  - open this tab during first print tests to confirm upload flow and errors.
+
+Screenshots
+-----------
+Use these names for client screenshots in this README:
+- `docs/images/setup-tab.png`
+- `docs/images/operations-tab.png`
+- `docs/images/monitoring-tab.png`
+- `docs/images/help-window.png`
+
+When image files are added, include:
+
+![Setup Tab](docs/images/setup-tab.png)
+![Operations Tab](docs/images/operations-tab.png)
+![Monitoring Tab](docs/images/monitoring-tab.png)
+![Help Window](docs/images/help-window.png)
+
+Install and First Run (Client)
+------------------------------
+1. Run `Padsign-Setup.cmd` as Administrator.
+2. In setup window:
+   - choose installation folder
+   - choose whether to create desktop shortcut
+3. App opens `Padsign Manager`.
+4. In `Setup` tab fill:
+   - `ApiUrl`
+   - `Authentication Header Name`
+   - `Authentication Header Value`
+   - `Email`
+   - `Company`
+5. Click `Save And Test PDF Sending`.
+6. Open `Operations` tab and click `Start Listener`.
+7. Print to printer `Padsign`.
+
+Required Fields
+---------------
+- `ApiUrl`
+- `AuthenticationHeaderName`
+- `AuthenticationHeaderValue`
+- `Email`
+- `Company`
+
+Advanced Fields
+---------------
+- `Port` (default `9100`)
+- `WorkingDirectory` (default `spool`)
+- `UploadTimeoutSeconds`
+- `MaxUploadRetries`
+- `RetryBackoffSeconds`
+- `CleanupOnSuccess`
+
+Runtime Behavior
+----------------
+- PDF payload:
+  - uploaded to Padsign API (`registerPDF`) with `file`, `email`, `company`.
+- Non-PDF payload:
+  - request is not sent
+  - listener logs: `document is not PDF. Upload request has not been made.`
+- `Remove PDF` button:
+  - calls remove-user API using current `email + company`.
+
+Status and Readiness
+--------------------
+Operations tab checklist expects all to be true:
+- valid and saved configuration
+- virtual printer installed
+- listener running
+- successful API test upload in current config context
+
+Troubleshooting (Client-Friendly)
+---------------------------------
+- `Could not connect`:
+  - API URL unavailable, DNS/network issue, firewall/proxy issue.
+- `Authorization error` (`401/403`):
+  - header name/value invalid or expired token.
+- `Bad request` (`400`):
+  - check URL endpoint and `email/company` values.
+- `Listener executable not found`:
+  - broken installation; reinstall with latest package.
+- Printer installed but button flow inconsistent:
+  - reopen app; statuses refresh automatically.
+
+Config and Logs
+---------------
+- Main config:
+  - `%LOCALAPPDATA%\Padsign\padsign.json`
+- Listener config copy:
+  - `<install folder>\listener\padsign.json`
+- Listener logs:
+  - `<install folder>\listener\logs\padsign.log`
+
+Build and Packaging (Internal)
+------------------------------
+Create single-file installer:
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\create-setup.ps1`
+
+Create client delivery folder:
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\create-client-package.ps1`
+
+Output:
+- `out\client-package\Padsign-Client-<timestamp>\Padsign-Setup.cmd`
+- `out\client-package\Padsign-Client-<timestamp>\README-CLIENT.txt`
+- `out\client-package\Padsign-Client-<timestamp>\SHA256SUMS.txt`
+
+Project Files
+-------------
+- `src/Padsign.Listener/` - listener/uploader runtime
+- `src/Padsign.Manager/` - WPF desktop UI
+- `scripts/install-printer.ps1` - printer installation
+- `scripts/remove-printer.ps1` - printer removal
+- `scripts/create-setup.ps1` - installer packaging
+- `scripts/create-client-package.ps1` - client bundle packaging
+- `config/padsign.sample.json` - default config template
