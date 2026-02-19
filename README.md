@@ -5,6 +5,22 @@ This solution installs a virtual printer named `Padsign` on Windows and uploads 
 
 No manual config-file editing is required for end users. All operational fields are editable in the desktop app (`Padsign Manager`).
 
+Quick Installation Guide
+------------------------
+1. Open the client delivery folder and run `Padsign-Setup.cmd`.
+2. Run it with **Run as administrator** (required for printer installation).
+3. In installer options:
+   - choose installation folder
+   - choose whether to create desktop shortcut
+4. After install, open `Padsign Manager`.
+5. In `Setup` tab, fill required fields and click `Save And Test PDF Sending`.
+6. In `Operations` tab, click `Start Listener`.
+7. Print to the `Padsign` printer.
+
+Notes:
+- Admin rights are required for installation/printer operations.
+- Daily use (editing config, monitoring logs, testing API) is done from `Padsign Manager`.
+
 Visual Architecture
 -------------------
 ```mermaid
@@ -148,6 +164,114 @@ Advanced Fields
 - `MaxUploadRetries`
 - `RetryBackoffSeconds`
 - `CleanupOnSuccess`
+
+Field Reference (Detailed)
+--------------------------
+`ApiUrl`
+- What it is:
+  - full API endpoint used for PDF upload test and runtime uploads.
+- Expected value:
+  - full HTTPS URL to Padsign register endpoint (example: `https://padsign.trustlynx.com/api/registerPDF`).
+- Why it matters:
+  - wrong URL causes upload failure (`400/404/connection`).
+
+`AuthenticationHeaderName`
+- What it is:
+  - HTTP header key used for authorization.
+- Expected value:
+  - usually `Authorization` unless your API gateway expects a custom key.
+- Why it matters:
+  - wrong header name means token is not recognized (`401/403`).
+
+`AuthenticationHeaderValue`
+- What it is:
+  - token or credential value sent in the auth header.
+- Expected value:
+  - usually `Bearer <token>` format.
+- Why it matters:
+  - missing/expired/invalid token causes auth failures (`401/403`).
+- UI helpers:
+  - `Show` checkbox reveals/hides value.
+  - `Copy` button copies current value.
+
+`Email`
+- What it is:
+  - user session identity part 1.
+- Expected value:
+  - valid user email (example: `name@company.com`).
+- Why it matters:
+  - sent with each upload and used by `Remove PDF` API call.
+
+`Company`
+- What it is:
+  - user session identity part 2.
+- Expected value:
+  - company/tenant value exactly as expected by backend.
+- Why it matters:
+  - combined with email to target the correct user session.
+
+`Port` (`RAW Port`)
+- What it is:
+  - local TCP port where virtual printer sends RAW print stream.
+- Default:
+  - `9100`.
+- Why it matters:
+  - printer port and listener port must match; mismatch means listener receives nothing.
+
+`WorkingDirectory`
+- What it is:
+  - local folder used by listener for spool/temp job files.
+- Default:
+  - `spool`.
+- Why it matters:
+  - ensure write permissions; invalid path may break job processing.
+
+`UploadTimeoutSeconds`
+- What it is:
+  - max wait time for one API request.
+- Typical value:
+  - `30`.
+- Why it matters:
+  - too low can fail slow networks; too high delays visible failure feedback.
+
+`MaxUploadRetries`
+- What it is:
+  - retry count for failed uploads.
+- Typical value:
+  - `3`.
+- Why it matters:
+  - improves reliability for transient network/API issues.
+
+`RetryBackoffSeconds`
+- What it is:
+  - delay between retry attempts.
+- Typical value:
+  - `2`.
+- Why it matters:
+  - prevents immediate rapid-fire retries against unstable endpoints.
+
+`CleanupOnSuccess` (`Cleanup spool files after successful upload`)
+- What it is:
+  - whether local spool artifacts are deleted after successful upload.
+- Recommended:
+  - enabled for cleaner disk usage; disabled only when debugging is needed.
+
+What Buttons Do
+---------------
+`Save And Test PDF Sending`
+- validates all fields, saves config, and performs immediate test upload.
+
+`Remove PDF`
+- sends remove-user request using current `Email + Company` and auth header.
+
+`Start Listener` / `Stop Listener`
+- starts or stops local listener process that receives print jobs from printer port.
+
+`Install Printer (Admin)`
+- creates/repairs Padsign virtual printer and RAW port mapping.
+
+`! Remove Printer (Risky)`
+- removes local Padsign printer; use only when uninstalling/troubleshooting.
 
 Runtime Behavior
 ----------------
