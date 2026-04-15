@@ -70,11 +70,11 @@ Setup Tab
 - Actions:
   - `Save And Test PDF Sending`:
     - validates input
-    - persists configuration
+    - persists configuration to both user config and listener config paths
     - sends a test PDF upload with current `email + company`
+    - automatically removes the test document from the server on success
+    - auto-restarts the listener if it was running (so config changes take effect immediately)
     - returns friendly error category plus technical details on failure
-  - `Remove PDF`:
-    - calls remove-user endpoint for current `email + company`
 - Setup status texts:
   - save state (`Unsaved changes` or `Saved`)
   - last upload test state (`success/failed/not run`)
@@ -208,7 +208,7 @@ Field Reference (Detailed)
 - Expected value:
   - valid user email (example: `name@company.com`).
 - Why it matters:
-  - sent with each upload and used by `Remove PDF` API call.
+  - sent with each upload to identify the user session.
 
 `Company`
 - What it is:
@@ -267,10 +267,8 @@ Field Reference (Detailed)
 What Buttons Do
 ---------------
 `Save And Test PDF Sending`
-- validates all fields, saves config, and performs immediate test upload.
-
-`Remove PDF`
-- sends remove-user request using current `Email + Company` and auth header.
+- validates all fields, saves config to both paths, sends test upload, and auto-removes test document from server on success.
+- if the listener is running, it is automatically restarted with the updated configuration.
 
 `Start Listener` / `Stop Listener`
 - starts or stops local listener process that receives print jobs from printer port.
@@ -288,8 +286,8 @@ Runtime Behavior
 - Non-PDF payload:
   - request is not sent
   - listener logs: `document is not PDF. Upload request has not been made.`
-- `Remove PDF` button:
-  - calls remove-user API using current `email + company`.
+- Startup auto-test:
+  - on launch, if configuration is valid and saved, the Manager automatically runs a connectivity test (upload + cleanup) and updates the readiness checklist.
 
 Status and Readiness
 --------------------

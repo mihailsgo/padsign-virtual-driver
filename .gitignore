@@ -1,0 +1,16 @@
+# Build outputs
+bin/
+obj/
+
+# Runtime artifacts
+out/logs/
+out/spool/
+
+# User-specific files
+*.user
+*.suo
+*.vs/
+
+# NuGet
+*.nupkg
+packages/

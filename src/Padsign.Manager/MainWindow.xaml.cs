@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -60,6 +61,12 @@ public partial class MainWindow : Window
         LoadConfigIntoForm();
         _ = RefreshLiveStateAsync();
         _refreshTimer.Start();
+
+        _ = Dispatcher.InvokeAsync(async () =>
+        {
+            await Task.Delay(1000);
+            await RunStartupTestAsync();
+        }, DispatcherPriority.Background);
     }
 
     private FileSystemWatcher? CreateConfigWatcher()
@@ -319,6 +326,52 @@ public partial class MainWindow : Window
         LastTestUploadStateTextBlock.Foreground = Brushes.SaddleBrown;
     }
 
+    private async Task RunStartupTestAsync()
+    {
+        var cfg = BuildConfigFromForm();
+        var errors = GetValidationErrors(cfg);
+        if (errors.Count > 0 || _isDirty)
+            return;
+
+        SetStatus("Running startup connectivity test...");
+        LastTestUploadStateTextBlock.Text = "Upload test: Running...";
+        LastTestUploadStateTextBlock.Foreground = Brushes.SaddleBrown;
+
+        try
+        {
+            var (success, message) = await RunTestUploadAndCleanupAsync(cfg);
+            _testUploadAttempted = true;
+            _testUploadSucceeded = success;
+
+            if (success)
+            {
+                _lastSuccessfulTestConfig = CloneConfig(cfg);
+                _lastSuccessfulTestAt = DateTime.Now;
+                _testUploadStale = false;
+                SetStatus("Startup connectivity test passed.");
+            }
+            else
+            {
+                _lastSuccessfulTestConfig = null;
+                _lastSuccessfulTestAt = null;
+                _testUploadStale = false;
+                SetStatus("Startup connectivity test failed.", true);
+            }
+        }
+        catch (Exception ex)
+        {
+            _testUploadAttempted = true;
+            _testUploadSucceeded = false;
+            _lastSuccessfulTestConfig = null;
+            _lastSuccessfulTestAt = null;
+            _testUploadStale = false;
+            SetStatus($"Startup connectivity test failed: {FormatTechnicalError(ex)}", true);
+        }
+
+        UpdateTestUploadStateText();
+        await RefreshLiveStateAsync();
+    }
+
     private Dictionary<string, string> GetValidationErrors(ManagerConfig cfg)
     {
         var errors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -467,7 +520,6 @@ public partial class MainWindow : Window
     private void UpdateActionAvailability(bool configValid, bool configSaved, bool printerInstalled, bool listenerRunning)
     {
         SaveAndTestButton.IsEnabled = configValid;
-        RemovePdfButton.IsEnabled = configValid && configSaved;
         InstallPrinterButton.IsEnabled = configValid && configSaved && !printerInstalled;
         RemovePrinterButton.IsEnabled = printerInstalled;
         if (listenerRunning)
@@ -595,6 +647,7 @@ public partial class MainWindow : Window
         try
         {
             cfg.Save(_paths.ConfigPath);
+            cfg.Save(_paths.ListenerConfigPath);
             _lastSavedConfig = CloneConfig(cfg);
             _isDirty = false;
             SetStatus("Configuration saved. Running test upload...");
@@ -611,27 +664,12 @@ public partial class MainWindow : Window
 
         try
         {
-            using var client = new HttpClient
-            {
-                Timeout = TimeSpan.FromSeconds(cfg.UploadTimeoutSeconds)
-            };
-            SetRequestHeader(client, cfg.AuthenticationHeaderName, cfg.AuthenticationHeaderValue);
-
-            var testPdf = Encoding.ASCII.GetBytes("%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF");
-            using var content = new MultipartFormDataContent();
-            var fileContent = new ByteArrayContent(testPdf);
-            fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
-            content.Add(fileContent, "file", $"padsign-test-{DateTime.Now:yyyyMMddHHmmss}.pdf");
-            content.Add(new StringContent(cfg.Email), "email");
-            content.Add(new StringContent(cfg.Company), "company");
-
-            var response = await client.PostAsync(cfg.ApiUrl, content);
-            var body = await response.Content.ReadAsStringAsync();
-            CommandOutputTextBox.Text = $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}{Environment.NewLine}{TrimBody(body)}";
+            var (success, message) = await RunTestUploadAndCleanupAsync(cfg);
+            CommandOutputTextBox.Text += message;
             _testUploadAttempted = true;
-            _testUploadSucceeded = response.IsSuccessStatusCode;
+            _testUploadSucceeded = success;
 
-            if (response.IsSuccessStatusCode)
+            if (success)
             {
                 _lastSuccessfulTestConfig = CloneConfig(cfg);
                 _lastSuccessfulTestAt = DateTime.Now;
@@ -645,8 +683,7 @@ public partial class MainWindow : Window
                 _lastSuccessfulTestAt = null;
                 _testUploadStale = false;
                 SetStatus("Configuration saved, but test upload failed. See command output.", true);
-                var friendly = BuildFriendlyUploadError(response.StatusCode, response.ReasonPhrase, body);
-                SetOperationResult("Save Config And Test", false, friendly);
+                SetOperationResult("Save Config And Test", false, message);
             }
         }
         catch (Exception ex)
@@ -663,62 +700,39 @@ public partial class MainWindow : Window
         }
 
         UpdateTestUploadStateText();
+        await RestartListenerIfRunningAsync();
         await RefreshLiveStateAsync();
     }
 
-    private async void RemovePdfButton_Click(object sender, RoutedEventArgs e)
+    private async Task RestartListenerIfRunningAsync()
     {
-        var cfg = BuildConfigFromForm();
-        var errors = GetValidationErrors(cfg);
-        ApplyValidationErrors(errors);
-        if (errors.Count > 0)
-        {
-            SetStatus("Cannot remove PDF. Fix validation issues first.", true);
-            CommandOutputTextBox.Text = string.Join(Environment.NewLine, errors.Values.Select((x, i) => $"{i + 1}. {x}"));
-            SetOperationResult("Remove PDF", false, "Remove blocked by validation errors.");
+        if (!IsListenerRunning())
             return;
-        }
-
-        if (_isDirty)
-        {
-            SetStatus("Save configuration before removing PDF.", true);
-            SetOperationResult("Remove PDF", false, "Save configuration first.");
-            return;
-        }
 
         try
         {
-            var removeUri = BuildRemoveUserUri(cfg.ApiUrl, cfg.Email, cfg.Company);
-            using var client = new HttpClient
+            if (_listenerProcess is { HasExited: false })
             {
-                Timeout = TimeSpan.FromSeconds(cfg.UploadTimeoutSeconds)
-            };
-            SetRequestHeader(client, cfg.AuthenticationHeaderName, cfg.AuthenticationHeaderValue);
-
-            var response = await client.GetAsync(removeUri);
-            var body = await response.Content.ReadAsStringAsync();
-            CommandOutputTextBox.Text = $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}{Environment.NewLine}{TrimBody(body)}";
-
-            if (response.IsSuccessStatusCode)
-            {
-                SetStatus("Remove PDF request succeeded.");
-                SetOperationResult("Remove PDF", true, $"Session removed for {cfg.Email}|{cfg.Company}.");
+                _listenerProcess.Kill(entireProcessTree: true);
+                _listenerProcess.Dispose();
+                _listenerProcess = null;
             }
-            else
+
+            foreach (var proc in Process.GetProcessesByName("Padsign.Listener"))
             {
-                SetStatus("Remove PDF request failed. See command output.", true);
-                SetOperationResult("Remove PDF", false,
-                    $"removeUser failed with HTTP {(int)response.StatusCode} {response.ReasonPhrase}. Body: {TrimBody(body)}");
+                try { proc.Kill(entireProcessTree: true); }
+                catch { }
+                finally { proc.Dispose(); }
             }
+
+            await Task.Delay(500);
+            await StartListenerAsync();
+            SetStatus("Listener restarted with updated configuration.");
         }
         catch (Exception ex)
         {
-            CommandOutputTextBox.Text = ex.ToString();
-            SetStatus("Remove PDF request failed with exception.", true);
-            SetOperationResult("Remove PDF", false, $"Remove PDF failed: {FormatTechnicalError(ex)}");
+            SetStatus($"Failed to restart listener: {FormatTechnicalError(ex)}", true);
         }
-
-        await RefreshLiveStateAsync();
     }
 
     private async void InstallPrinterButton_Click(object sender, RoutedEventArgs e)
@@ -1075,7 +1089,134 @@ public partial class MainWindow : Window
         return $"Upload failed due to unexpected error. Technical: {FormatTechnicalError(ex)}";
     }
 
-    private static string BuildRemoveUserUri(string apiUrl, string email, string company)
+    private static byte[] BuildTestPdf()
+    {
+        var sb = new StringBuilder();
+
+        // Content stream — two paragraphs of demo text
+        var text =
+            "BT\n" +
+            "/F1 18 Tf\n" +
+            "50 720 Td\n" +
+            "(Padsign Connectivity Test) Tj\n" +
+            "/F1 11 Tf\n" +
+            "0 -30 Td\n" +
+            "(This document was generated automatically by Padsign Manager) Tj\n" +
+            "0 -18 Td\n" +
+            "(to verify that the connection to the PadSign server is working.) Tj\n" +
+            "0 -18 Td\n" +
+            "(If you can see this document in the PadSign portal, the upload) Tj\n" +
+            "0 -18 Td\n" +
+            "(was successful. The document will be removed automatically.) Tj\n" +
+            "0 -36 Td\n" +
+            "(This is a one-page test PDF containing a few paragraphs of text.) Tj\n" +
+            "0 -18 Td\n" +
+            "(No action is required on your part. The Padsign Manager application) Tj\n" +
+            "0 -18 Td\n" +
+            "(will clean up this test document after verifying the connection.) Tj\n" +
+            "ET\n";
+        var streamBytes = Encoding.ASCII.GetBytes(text);
+        var streamLen = streamBytes.Length;
+
+        // Object 1: Catalog
+        sb.Append("%PDF-1.4\n");
+        var obj1Off = sb.Length;
+        sb.Append("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
+
+        // Object 2: Pages
+        var obj2Off = sb.Length;
+        sb.Append("2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n");
+
+        // Object 3: Page
+        var obj3Off = sb.Length;
+        sb.Append($"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n");
+
+        // Object 4: Content stream
+        var obj4Off = sb.Length;
+        sb.Append($"4 0 obj\n<< /Length {streamLen} >>\nstream\n");
+        sb.Append(text);
+        sb.Append("endstream\nendobj\n");
+
+        // Object 5: Font
+        var obj5Off = sb.Length;
+        sb.Append("5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n");
+
+        // Xref table
+        var xrefOff = sb.Length;
+        sb.Append("xref\n0 6\n");
+        sb.Append("0000000000 65535 f \n");
+        sb.AppendFormat("{0:D10} 00000 n \n", obj1Off);
+        sb.AppendFormat("{0:D10} 00000 n \n", obj2Off);
+        sb.AppendFormat("{0:D10} 00000 n \n", obj3Off);
+        sb.AppendFormat("{0:D10} 00000 n \n", obj4Off);
+        sb.AppendFormat("{0:D10} 00000 n \n", obj5Off);
+
+        // Trailer
+        sb.Append($"trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n{xrefOff}\n%%EOF");
+
+        return Encoding.ASCII.GetBytes(sb.ToString());
+    }
+
+    private async Task<(bool Success, string Message)> RunTestUploadAndCleanupAsync(ManagerConfig cfg)
+    {
+        using var client = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(cfg.UploadTimeoutSeconds)
+        };
+        SetRequestHeader(client, cfg.AuthenticationHeaderName, cfg.AuthenticationHeaderValue);
+
+        var testPdf = BuildTestPdf();
+        using var content = new MultipartFormDataContent();
+        var fileContent = new ByteArrayContent(testPdf);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+        content.Add(fileContent, "file", $"padsign-test-{DateTime.Now:yyyyMMddHHmmss}.pdf");
+        content.Add(new StringContent(cfg.Email), "email");
+        content.Add(new StringContent(cfg.Company), "company");
+
+        var response = await client.PostAsync(cfg.ApiUrl, content);
+        var body = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var friendly = BuildFriendlyUploadError(response.StatusCode, response.ReasonPhrase, body);
+            return (false, $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}\n{TrimBody(body)}\n\n{friendly}");
+        }
+
+        // Upload succeeded — try to extract docId and clean up
+        string? docId = null;
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("docId", out var docIdElement))
+                docId = docIdElement.GetString();
+        }
+        catch { /* JSON parse failure is not fatal */ }
+
+        string cleanupNote;
+        if (!string.IsNullOrEmpty(docId))
+        {
+            try
+            {
+                var removeUri = BuildRemoveUserByDocUri(cfg.ApiUrl, docId);
+                var removeResponse = await client.GetAsync(removeUri);
+                cleanupNote = removeResponse.IsSuccessStatusCode
+                    ? "Test document removed from server."
+                    : $"Test document cleanup returned HTTP {(int)removeResponse.StatusCode} (document may remain on server).";
+            }
+            catch (Exception ex)
+            {
+                cleanupNote = $"Test document cleanup failed: {FormatTechnicalError(ex)}";
+            }
+        }
+        else
+        {
+            cleanupNote = "Could not extract document ID from response; test document may remain on server.";
+        }
+
+        return (true, $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}\n{TrimBody(body)}\n\n{cleanupNote}");
+    }
+
+    private static string BuildRemoveUserByDocUri(string apiUrl, string docId)
     {
         if (!Uri.TryCreate(apiUrl, UriKind.Absolute, out var parsed))
             throw new InvalidOperationException("ApiUrl is invalid.");
@@ -1089,7 +1230,7 @@ public partial class MainWindow : Window
         var builder = new UriBuilder(parsed)
         {
             Path = endpointPath,
-            Query = $"email={Uri.EscapeDataString(email)}&company={Uri.EscapeDataString(company)}"
+            Query = $"doc={Uri.EscapeDataString(docId)}"
         };
         return builder.Uri.ToString();
     }
@@ -1133,10 +1274,8 @@ public partial class MainWindow : Window
 
 3) Main actions
 - Save And Test PDF Sending:
-  Saves current settings and immediately sends a small test PDF to the configured API with current email/company.
-- Remove PDF:
-  Calls /removeUser with current email+company using same auth header.
-  No extra input required.
+  Saves current settings and sends a test PDF to the configured API.
+  On success, the test document is automatically removed from the server.
 - Start Listener:
   Starts local listener process with saved config.
 
@@ -1151,9 +1290,6 @@ public partial class MainWindow : Window
   Verify Authentication Header Name/Value and API key validity.
 - 400 from registerPDF:
   Verify ApiUrl points to register endpoint and Email/Company are filled.
-- removeUser fails:
-  ApiUrl should be in /api/registerPDF form so app resolves /api/removeUser.
-  Also verify API key has rights for removeUser.
 - Listener start fails:
   Ensure listener executable exists and config is saved.
 - Printing does nothing:
