@@ -1105,11 +1105,24 @@ public partial class MainWindow : Window
     {
         var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
         var line = $"{timestamp}  {message}";
-        if (!string.IsNullOrEmpty(LogTailTextBox.Text))
-            LogTailTextBox.Text += Environment.NewLine + line;
-        else
-            LogTailTextBox.Text = line;
-        LogTailTextBox.ScrollToEnd();
+        try
+        {
+            var logDir = Path.GetDirectoryName(_paths.LogPath);
+            if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
+                Directory.CreateDirectory(logDir);
+            using var stream = new FileStream(_paths.LogPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+            using var writer = new StreamWriter(stream);
+            writer.WriteLine(line);
+        }
+        catch
+        {
+            // Fall back to in-memory append if file write fails
+            if (!string.IsNullOrEmpty(LogTailTextBox.Text))
+                LogTailTextBox.Text += Environment.NewLine + line;
+            else
+                LogTailTextBox.Text = line;
+        }
+        RefreshLogTail();
     }
 
     private static void SetRequestHeader(HttpClient client, string headerName, string headerValue)
