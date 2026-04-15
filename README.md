@@ -5,21 +5,31 @@ This solution installs a virtual printer named `Padsign` on Windows and uploads 
 
 No manual config-file editing is required for end users. All operational fields are editable in the desktop app (`Padsign Manager`).
 
+Getting the Installer
+---------------------
+Download `Padsign-Setup.cmd` from [`out/installer/Padsign-Setup.cmd`](out/installer/Padsign-Setup.cmd) in this repository.
+
+Alternatively, clone the repository and find the file at `out/installer/Padsign-Setup.cmd`.
+
+To rebuild the installer from source:
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/create-setup.ps1
+```
+
 Quick Installation Guide
 ------------------------
-1. Open the client delivery folder and run `Padsign-Setup.cmd`.
-2. Run it with **Run as administrator** (required for printer installation).
-3. In installer options:
+1. Right-click `Padsign-Setup.cmd` and choose **Run as administrator** (required for printer installation).
+2. In installer options:
    - choose installation folder
    - choose whether to create desktop shortcut
-4. After install, open `Padsign Manager` from desktop shortcut, or run executable directly:
+3. After install, open `Padsign Manager` from desktop shortcut, or run executable directly:
    - default full path:
      - `C:\Program Files\Padsign\manager\Padsign.Manager.exe`
    - if custom install folder was selected:
      - `<YourInstallFolder>\manager\Padsign.Manager.exe`
-5. In `Setup` tab, fill required fields and click `Save And Test PDF Sending`.
-6. In `Operations` tab, click `Start Listener`.
-7. Print to the `Padsign` printer.
+4. In `Setup` tab, fill required fields and click `Save And Test PDF Sending`.
+5. In `Operations` tab, click `Start Listener`.
+6. Print to the `Padsign` printer.
 
 Notes:
 - Admin rights are required for installation/printer operations.
@@ -137,7 +147,7 @@ When image files are added, include:
 
 Install and First Run (Client)
 ------------------------------
-1. Run `Padsign-Setup.cmd` as Administrator.
+1. Download `Padsign-Setup.cmd` from [`out/installer/Padsign-Setup.cmd`](out/installer/Padsign-Setup.cmd) and run as Administrator.
 2. In setup window:
    - choose installation folder
    - choose whether to create desktop shortcut

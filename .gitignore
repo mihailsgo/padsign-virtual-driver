@@ -5,6 +5,10 @@ obj/
 # Runtime artifacts
 out/logs/
 out/spool/
+out/client-package/
+
+# Claude Code project instructions (internal only)
+CLAUDE.md
 
 # User-specific files
 *.user
