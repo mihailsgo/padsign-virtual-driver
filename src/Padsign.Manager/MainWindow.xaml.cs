@@ -520,6 +520,7 @@ public partial class MainWindow : Window
     private void UpdateActionAvailability(bool configValid, bool configSaved, bool printerInstalled, bool listenerRunning)
     {
         SaveAndTestButton.IsEnabled = configValid;
+        RemovePdfButton.IsEnabled = configValid && configSaved;
         InstallPrinterButton.IsEnabled = configValid && configSaved && !printerInstalled;
         RemovePrinterButton.IsEnabled = printerInstalled;
         if (listenerRunning)
@@ -733,6 +734,61 @@ public partial class MainWindow : Window
         {
             SetStatus($"Failed to restart listener: {FormatTechnicalError(ex)}", true);
         }
+    }
+
+    private async void RemovePdfButton_Click(object sender, RoutedEventArgs e)
+    {
+        var cfg = BuildConfigFromForm();
+        var errors = GetValidationErrors(cfg);
+        ApplyValidationErrors(errors);
+        if (errors.Count > 0)
+        {
+            SetStatus("Cannot remove PDF. Fix validation issues first.", true);
+            CommandOutputTextBox.Text = string.Join(Environment.NewLine, errors.Values.Select((x, i) => $"{i + 1}. {x}"));
+            SetOperationResult("Remove PDF", false, "Remove blocked by validation errors.");
+            return;
+        }
+
+        if (_isDirty)
+        {
+            SetStatus("Save configuration before removing PDF.", true);
+            SetOperationResult("Remove PDF", false, "Save configuration first.");
+            return;
+        }
+
+        try
+        {
+            var removeUri = BuildRemoveUserUri(cfg.ApiUrl, cfg.Email, cfg.Company);
+            using var client = new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(cfg.UploadTimeoutSeconds)
+            };
+            SetRequestHeader(client, cfg.AuthenticationHeaderName, cfg.AuthenticationHeaderValue);
+
+            var response = await client.GetAsync(removeUri);
+            var body = await response.Content.ReadAsStringAsync();
+            CommandOutputTextBox.Text = $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}{Environment.NewLine}{TrimBody(body)}";
+
+            if (response.IsSuccessStatusCode)
+            {
+                SetStatus("Remove PDF request succeeded.");
+                SetOperationResult("Remove PDF", true, $"Last document removed for {cfg.Email}|{cfg.Company}.");
+            }
+            else
+            {
+                SetStatus("Remove PDF request failed. See command output.", true);
+                SetOperationResult("Remove PDF", false,
+                    $"removeUser failed with HTTP {(int)response.StatusCode} {response.ReasonPhrase}. Body: {TrimBody(body)}");
+            }
+        }
+        catch (Exception ex)
+        {
+            CommandOutputTextBox.Text = ex.ToString();
+            SetStatus("Remove PDF request failed with exception.", true);
+            SetOperationResult("Remove PDF", false, $"Remove PDF failed: {FormatTechnicalError(ex)}");
+        }
+
+        await RefreshLiveStateAsync();
     }
 
     private async void InstallPrinterButton_Click(object sender, RoutedEventArgs e)
@@ -1251,6 +1307,25 @@ public partial class MainWindow : Window
         return builder.Uri.ToString();
     }
 
+    private static string BuildRemoveUserUri(string apiUrl, string email, string company)
+    {
+        if (!Uri.TryCreate(apiUrl, UriKind.Absolute, out var parsed))
+            throw new InvalidOperationException("ApiUrl is invalid.");
+
+        var endpointPath = parsed.AbsolutePath;
+        if (endpointPath.EndsWith("/registerPDF", StringComparison.OrdinalIgnoreCase))
+            endpointPath = endpointPath[..^"/registerPDF".Length] + "/removeUser";
+        else
+            endpointPath = "/api/removeUser";
+
+        var builder = new UriBuilder(parsed)
+        {
+            Path = endpointPath,
+            Query = $"email={Uri.EscapeDataString(email)}&company={Uri.EscapeDataString(company)}"
+        };
+        return builder.Uri.ToString();
+    }
+
     private static string BuildProcessOutput(ProcessResult result)
     {
         var sb = new StringBuilder();
@@ -1292,6 +1367,9 @@ public partial class MainWindow : Window
 - Save And Test PDF Sending:
   Saves current settings and sends a test PDF to the configured API.
   On success, the test document is automatically removed from the server.
+- Remove PDF:
+  Removes the last uploaded document for the current email + company session.
+  Use this when a wrong document was sent to signing.
 - Start Listener:
   Starts local listener process with saved config.
 
