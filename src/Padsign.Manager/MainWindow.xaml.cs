@@ -935,6 +935,12 @@ public partial class MainWindow : Window
         await RefreshLiveStateAsync();
     }
 
+    private void MainTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (MonitoringTab.IsSelected)
+            RefreshLogTail();
+    }
+
     private void RefreshLogButton_Click(object sender, RoutedEventArgs e)
     {
         RefreshLogTail();
@@ -1020,10 +1026,20 @@ public partial class MainWindow : Window
             return;
         }
 
-        var lines = File.ReadAllLines(_paths.LogPath);
-        var tail = lines.TakeLast(200);
-        LogTailTextBox.Text = string.Join(Environment.NewLine, tail);
-        LogTailTextBox.ScrollToEnd();
+        try
+        {
+            using var stream = new FileStream(_paths.LogPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var reader = new StreamReader(stream);
+            var allText = reader.ReadToEnd();
+            var lines = allText.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            var tail = lines.TakeLast(200);
+            LogTailTextBox.Text = string.Join(Environment.NewLine, tail);
+            LogTailTextBox.ScrollToEnd();
+        }
+        catch (IOException)
+        {
+            // File temporarily locked — skip this refresh cycle
+        }
     }
 
     private static void SetRequestHeader(HttpClient client, string headerName, string headerValue)

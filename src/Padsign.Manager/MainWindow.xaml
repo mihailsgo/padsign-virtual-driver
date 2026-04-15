@@ -139,7 +139,7 @@
         </Border>
 
         <Border Grid.Row="2" Background="White" CornerRadius="12" Padding="12" BorderBrush="#FFE0E6ED" BorderThickness="1">
-            <TabControl Name="MainTabs" Background="Transparent" BorderThickness="0">
+            <TabControl Name="MainTabs" Background="Transparent" BorderThickness="0" SelectionChanged="MainTabs_SelectionChanged">
                 <TabItem Header="Setup">
                     <Grid Margin="16">
                         <Grid.RowDefinitions>
