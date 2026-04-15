@@ -773,12 +773,14 @@ public partial class MainWindow : Window
             {
                 SetStatus("Remove PDF request succeeded.");
                 SetOperationResult("Remove PDF", true, $"Last document removed for {cfg.Email}|{cfg.Company}.");
+                AppendToMonitorLog($"[Manager] Remove PDF succeeded for {cfg.Email}|{cfg.Company}. HTTP {(int)response.StatusCode}.");
             }
             else
             {
                 SetStatus("Remove PDF request failed. See command output.", true);
                 SetOperationResult("Remove PDF", false,
                     $"removeUser failed with HTTP {(int)response.StatusCode} {response.ReasonPhrase}. Body: {TrimBody(body)}");
+                AppendToMonitorLog($"[Manager] Remove PDF failed for {cfg.Email}|{cfg.Company}. HTTP {(int)response.StatusCode} {response.ReasonPhrase}.");
             }
         }
         catch (Exception ex)
@@ -786,6 +788,7 @@ public partial class MainWindow : Window
             CommandOutputTextBox.Text = ex.ToString();
             SetStatus("Remove PDF request failed with exception.", true);
             SetOperationResult("Remove PDF", false, $"Remove PDF failed: {FormatTechnicalError(ex)}");
+            AppendToMonitorLog($"[Manager] Remove PDF failed: {FormatTechnicalError(ex)}");
         }
 
         await RefreshLiveStateAsync();
@@ -1096,6 +1099,17 @@ public partial class MainWindow : Window
         {
             // File temporarily locked — skip this refresh cycle
         }
+    }
+
+    private void AppendToMonitorLog(string message)
+    {
+        var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        var line = $"{timestamp}  {message}";
+        if (!string.IsNullOrEmpty(LogTailTextBox.Text))
+            LogTailTextBox.Text += Environment.NewLine + line;
+        else
+            LogTailTextBox.Text = line;
+        LogTailTextBox.ScrollToEnd();
     }
 
     private static void SetRequestHeader(HttpClient client, string headerName, string headerValue)
