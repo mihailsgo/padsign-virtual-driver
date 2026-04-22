@@ -1271,6 +1271,7 @@ public partial class MainWindow : Window
         content.Add(fileContent, "file", $"padsign-test-{DateTime.Now:yyyyMMddHHmmss}.pdf");
         content.Add(new StringContent(cfg.Email), "email");
         content.Add(new StringContent(cfg.Company), "company");
+        content.Add(new StringContent("virtual-printer"), "source");
 
         var response = await client.PostAsync(cfg.ApiUrl, content);
         var body = await response.Content.ReadAsStringAsync();

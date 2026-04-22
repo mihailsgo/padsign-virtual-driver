@@ -259,6 +259,9 @@ internal sealed class JobProcessor
         content.Add(pdfContent, "file", fileName);
         content.Add(new StringContent(_config.Email), "email");
         content.Add(new StringContent(_config.Company), "company");
+        // Mark uploads from the virtual printer so the server can trigger
+        // source-specific enrichment (e.g. CustomerData barcode lookup).
+        content.Add(new StringContent("virtual-printer"), "source");
 
         _logger.Info($"Job {jobId}: uploading {fileName} to {_config.ApiUrl} for session {_config.Email}|{_config.Company}");
 
