@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 
@@ -25,7 +26,11 @@ internal static class Program
             return 1;
         }
 
-        logger.Info("Padsign listener starting...");
+        var version = Assembly.GetExecutingAssembly()
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+            ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)
+            ?? "0.0.0";
+        logger.Info($"Padsign listener v{version} starting...");
         logger.Info($"Listening on TCP port {config.Port}, working dir: {config.WorkingDirectory}");
 
         var processor = new JobProcessor(config, logger);

@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -33,9 +34,19 @@ public partial class MainWindow : Window
     private bool _testUploadAttempted;
     private bool _configChangedOnDisk;
 
+    private static string GetAppVersion()
+    {
+        var asm = Assembly.GetExecutingAssembly();
+        var info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
+        if (!string.IsNullOrWhiteSpace(info?.InformationalVersion))
+            return info.InformationalVersion;
+        return asm.GetName().Version?.ToString(3) ?? "0.0.0";
+    }
+
     public MainWindow()
     {
         InitializeComponent();
+        Title = $"Padsign Manager v{GetAppVersion()}";
         _paths = AppPaths.Discover();
         _refreshTimer = new DispatcherTimer
         {

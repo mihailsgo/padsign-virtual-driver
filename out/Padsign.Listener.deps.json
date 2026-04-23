@@ -6,7 +6,7 @@
   "compilationOptions": {},
   "targets": {
     ".NETCoreApp,Version=v6.0": {
-      "Padsign.Listener/1.0.0": {
+      "Padsign.Listener/1.1.0": {
         "runtime": {
           "Padsign.Listener.dll": {}
         }
@@ -14,7 +14,7 @@
     }
   },
   "libraries": {
-    "Padsign.Listener/1.0.0": {
+    "Padsign.Listener/1.1.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
