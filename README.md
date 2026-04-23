@@ -7,7 +7,16 @@ No manual config-file editing is required for end users. All operational fields 
 
 Getting the Installer
 ---------------------
-Download `Padsign-Setup.cmd` from [`out/installer/Padsign-Setup.cmd`](out/installer/Padsign-Setup.cmd) in this repository.
+The only file the end user needs is `Padsign-Setup.cmd`. Pick one of the direct download links below (both point to the current `main` branch and serve the same file):
+
+- GitLab (recommended for external delivery):
+  https://gitlab.com/trustlynx-public/padsign-virtual-driver/-/raw/main/out/installer/Padsign-Setup.cmd?inline=false
+- GitHub mirror:
+  https://github.com/mihailsgo/padsign-virtual-driver/raw/main/out/installer/Padsign-Setup.cmd
+
+Expected file size is around 293 KB (approximately 292 to 300 KB). Run the file as Administrator on Windows.
+
+To verify the version after installation, the Manager window title should read `Padsign Manager vX.Y.Z` (current release is `v1.1.0`).
 
 Alternatively, clone the repository and find the file at `out/installer/Padsign-Setup.cmd`.
 
@@ -147,7 +156,7 @@ When image files are added, include:
 
 Install and First Run (Client)
 ------------------------------
-1. Download `Padsign-Setup.cmd` from [`out/installer/Padsign-Setup.cmd`](out/installer/Padsign-Setup.cmd) and run as Administrator.
+1. Download `Padsign-Setup.cmd` from one of the direct links in the "Getting the Installer" section above and run as Administrator.
 2. In setup window:
    - choose installation folder
    - choose whether to create desktop shortcut
