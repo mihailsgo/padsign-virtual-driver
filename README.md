@@ -16,7 +16,7 @@ The only file the end user needs is `Padsign-Setup.cmd`. Pick one of the direct 
 
 Expected file size is around 293 KB (approximately 292 to 300 KB). Run the file as Administrator on Windows.
 
-To verify the version after installation, the Manager window title should read `Padsign Manager vX.Y.Z` (current release is `v1.1.0`).
+To verify the version after installation, the Manager window title should read `Padsign Manager vX.Y.Z` (current release is `v1.2.0`).
 
 Alternatively, clone the repository and find the file at `out/installer/Padsign-Setup.cmd`.
 
@@ -24,6 +24,11 @@ To rebuild the installer from source:
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/create-setup.ps1
 ```
+
+Changelog
+---------
+- **v1.2.0** — Signed-PDF receive-back. After a print job is uploaded, the listener polls the PadSign server for the signed PDF, downloads it to the configured **Signed Output Folder** (`SignedOutputPath`, default `D:\VM\SignedDocs`) under the server-provided filename, then acknowledges delivery (the server deletes its copy). Adds: a one-time startup catch-up; a `Signed Output Folder` field in the Setup tab; new config fields `ReceiveBackEnabled` / `ReceiveBackPollSeconds` (default 5) / `ReceiveBackTimeoutMinutes` (default 30); and a `Receive-back` status chip in the header. Failed acks are retried without re-downloading. Endpoints used (same `REGISTER_PDF_API_KEY` auth): `GET /api/signedPdf/pending`, `GET /api/signedPdf`, `POST /api/signedPdf/ack`.
+- **v1.1.0** — Initial release. Virtual printer that captures Windows print jobs, detects PDF content, and uploads to the PadSign server (`POST /api/registerPDF`, API-key auth, `source=virtual-printer`). WPF Manager for configuration (API URL, auth, email, company), printer install/remove, listener start/stop, live log monitoring, and test upload with auto-cleanup.
 
 Quick Installation Guide
 ------------------------
