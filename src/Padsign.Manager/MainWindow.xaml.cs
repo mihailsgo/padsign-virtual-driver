@@ -172,6 +172,7 @@ public partial class MainWindow : Window
             CompanyTextBox.Text = cfg.Company;
             PortTextBox.Text = cfg.Port.ToString();
             WorkingDirectoryTextBox.Text = cfg.WorkingDirectory;
+            SignedOutputPathTextBox.Text = cfg.SignedOutputPath;
             UploadTimeoutTextBox.Text = cfg.UploadTimeoutSeconds.ToString();
             MaxRetriesTextBox.Text = cfg.MaxUploadRetries.ToString();
             RetryBackoffTextBox.Text = cfg.RetryBackoffSeconds.ToString();
@@ -263,7 +264,12 @@ public partial class MainWindow : Window
             UploadTimeoutSeconds = ParseInt(UploadTimeoutTextBox.Text, 30),
             MaxUploadRetries = ParseInt(MaxRetriesTextBox.Text, 3),
             RetryBackoffSeconds = ParseInt(RetryBackoffTextBox.Text, 2),
-            CleanupOnSuccess = CleanupOnSuccessCheckBox.IsChecked == true
+            CleanupOnSuccess = CleanupOnSuccessCheckBox.IsChecked == true,
+            SignedOutputPath = string.IsNullOrWhiteSpace(SignedOutputPathTextBox.Text) ? @"D:\VM\SignedDocs" : SignedOutputPathTextBox.Text.Trim(),
+            // Receive-back tuning is config-file-only; preserve hand-edited values across UI saves.
+            ReceiveBackEnabled = _lastSavedConfig?.ReceiveBackEnabled ?? true,
+            ReceiveBackPollSeconds = _lastSavedConfig?.ReceiveBackPollSeconds ?? 5,
+            ReceiveBackTimeoutMinutes = _lastSavedConfig?.ReceiveBackTimeoutMinutes ?? 30
         };
     }
 
@@ -284,7 +290,11 @@ public partial class MainWindow : Window
             UploadTimeoutSeconds = cfg.UploadTimeoutSeconds,
             MaxUploadRetries = cfg.MaxUploadRetries,
             RetryBackoffSeconds = cfg.RetryBackoffSeconds,
-            CleanupOnSuccess = cfg.CleanupOnSuccess
+            CleanupOnSuccess = cfg.CleanupOnSuccess,
+            SignedOutputPath = cfg.SignedOutputPath,
+            ReceiveBackEnabled = cfg.ReceiveBackEnabled,
+            ReceiveBackPollSeconds = cfg.ReceiveBackPollSeconds,
+            ReceiveBackTimeoutMinutes = cfg.ReceiveBackTimeoutMinutes
         };
 
     private static bool AreConfigsEquivalent(ManagerConfig a, ManagerConfig b)
@@ -299,7 +309,11 @@ public partial class MainWindow : Window
                && a.UploadTimeoutSeconds == b.UploadTimeoutSeconds
                && a.MaxUploadRetries == b.MaxUploadRetries
                && a.RetryBackoffSeconds == b.RetryBackoffSeconds
-               && a.CleanupOnSuccess == b.CleanupOnSuccess;
+               && a.CleanupOnSuccess == b.CleanupOnSuccess
+               && string.Equals(a.SignedOutputPath, b.SignedOutputPath, StringComparison.Ordinal)
+               && a.ReceiveBackEnabled == b.ReceiveBackEnabled
+               && a.ReceiveBackPollSeconds == b.ReceiveBackPollSeconds
+               && a.ReceiveBackTimeoutMinutes == b.ReceiveBackTimeoutMinutes;
     }
 
     private void UpdateDirtyState()
@@ -405,6 +419,13 @@ public partial class MainWindow : Window
             errors["MaxUploadRetries"] = "Retries must be greater than 0.";
         if (cfg.RetryBackoffSeconds <= 0)
             errors["RetryBackoffSeconds"] = "Backoff must be greater than 0.";
+        if (cfg.ReceiveBackEnabled)
+        {
+            if (string.IsNullOrWhiteSpace(cfg.SignedOutputPath))
+                errors["SignedOutputPath"] = "Signed output folder is required when receive-back is enabled.";
+            else if (!Path.IsPathFullyQualified(cfg.SignedOutputPath))
+                errors["SignedOutputPath"] = "Enter a full path, e.g. D:\\VM\\SignedDocs.";
+        }
 
         return errors;
     }
@@ -421,7 +442,8 @@ public partial class MainWindow : Window
             PortErrorTextBlock,
             UploadTimeoutErrorTextBlock,
             MaxRetriesErrorTextBlock,
-            RetryBackoffErrorTextBlock
+            RetryBackoffErrorTextBlock,
+            SignedOutputPathErrorTextBlock
         };
         foreach (var target in targets)
         {
@@ -442,6 +464,7 @@ public partial class MainWindow : Window
         SetValidationError(UploadTimeoutErrorTextBlock, errors.TryGetValue("UploadTimeoutSeconds", out var timeoutErr) ? timeoutErr : null);
         SetValidationError(MaxRetriesErrorTextBlock, errors.TryGetValue("MaxUploadRetries", out var retriesErr) ? retriesErr : null);
         SetValidationError(RetryBackoffErrorTextBlock, errors.TryGetValue("RetryBackoffSeconds", out var backoffErr) ? backoffErr : null);
+        SetValidationError(SignedOutputPathErrorTextBlock, errors.TryGetValue("SignedOutputPath", out var signedOutErr) ? signedOutErr : null);
     }
 
     private static void SetValidationError(TextBlock target, string? message)
@@ -489,6 +512,8 @@ public partial class MainWindow : Window
             PrinterStatusChipText.Text = printerInstalled ? "Printer: Installed" : "Printer: Missing";
             PrinterStatusChipText.Foreground = printerInstalled ? Brushes.DarkBlue : Brushes.SaddleBrown;
 
+            UpdateReceiveBackStatus(cfg);
+
             UpdateReadinessChecklist(configValid, configSaved, printerInstalled, listenerRunning, _testUploadSucceeded);
             UpdateActionAvailability(configValid, configSaved, printerInstalled, listenerRunning);
         }
@@ -500,10 +525,86 @@ public partial class MainWindow : Window
             ListenerStatusChipText.Foreground = Brushes.DarkRed;
             PrinterStatusChipText.Text = "Printer: Status error";
             PrinterStatusChipText.Foreground = Brushes.DarkRed;
+            ReceiveBackStatusChipText.Text = "Receive-back: status error";
+            ReceiveBackStatusChipText.Foreground = Brushes.DarkRed;
             CommandOutputTextBox.Text = ex.ToString();
             SetStatus("Status refresh failed. See command output.", true);
             SetOperationResult("Refresh Status", false, "Automatic status refresh failed.");
         }
+    }
+
+    private void UpdateReceiveBackStatus(ManagerConfig cfg)
+    {
+        if (!cfg.ReceiveBackEnabled)
+        {
+            ReceiveBackStatusChipText.Text = "Receive-back: off";
+            ReceiveBackStatusChipText.Foreground = Brushes.Gray;
+            ReceiveBackStatusChipText.ToolTip = "Receive-back is disabled in configuration.";
+            return;
+        }
+
+        try
+        {
+            var statusPath = Path.Combine(ResolveListenerWorkingDir(cfg), "receiveback-status.json");
+            if (!File.Exists(statusPath))
+            {
+                ReceiveBackStatusChipText.Text = "Receive-back: idle";
+                ReceiveBackStatusChipText.Foreground = Brushes.Gray;
+                ReceiveBackStatusChipText.ToolTip = "No receive-back activity yet.";
+                return;
+            }
+
+            using var doc = JsonDocument.Parse(File.ReadAllText(statusPath));
+            var root = doc.RootElement;
+            var last = GetStr(root, "lastStatus") ?? "idle";
+            var reason = GetStr(root, "reason") ?? string.Empty;
+            var filename = GetStr(root, "filename");
+            var savedPath = GetStr(root, "savedPath");
+            var ts = GetStr(root, "timestampUtc");
+
+            switch (last)
+            {
+                case "success":
+                    ReceiveBackStatusChipText.Text = filename != null ? $"Receive-back: delivered {filename}" : "Receive-back: delivered";
+                    ReceiveBackStatusChipText.Foreground = Brushes.DarkGreen;
+                    break;
+                case "pending":
+                    ReceiveBackStatusChipText.Text = "Receive-back: pending";
+                    ReceiveBackStatusChipText.Foreground = Brushes.SaddleBrown;
+                    break;
+                case "failed":
+                    ReceiveBackStatusChipText.Text = "Receive-back: failed";
+                    ReceiveBackStatusChipText.Foreground = Brushes.DarkRed;
+                    break;
+                default:
+                    ReceiveBackStatusChipText.Text = "Receive-back: idle";
+                    ReceiveBackStatusChipText.Foreground = Brushes.Gray;
+                    break;
+            }
+
+            var tip = last;
+            if (!string.IsNullOrWhiteSpace(reason)) tip += $" — {reason}";
+            if (savedPath != null) tip += $"\nSaved: {savedPath}";
+            if (ts != null) tip += $"\nAt: {ts} (UTC)";
+            ReceiveBackStatusChipText.ToolTip = tip;
+        }
+        catch (Exception ex)
+        {
+            ReceiveBackStatusChipText.Text = "Receive-back: status error";
+            ReceiveBackStatusChipText.Foreground = Brushes.DarkRed;
+            ReceiveBackStatusChipText.ToolTip = ex.Message;
+        }
+    }
+
+    private static string? GetStr(JsonElement root, string name) =>
+        root.TryGetProperty(name, out var el) && el.ValueKind == JsonValueKind.String ? el.GetString() : null;
+
+    private string ResolveListenerWorkingDir(ManagerConfig cfg)
+    {
+        var wd = string.IsNullOrWhiteSpace(cfg.WorkingDirectory) ? "spool" : cfg.WorkingDirectory;
+        if (Path.IsPathRooted(wd)) return wd;
+        var listenerDir = Path.GetDirectoryName(_paths.ListenerExePath) ?? _paths.RootDirectory;
+        return Path.GetFullPath(Path.Combine(listenerDir, wd));
     }
 
     private void UpdateReadinessChecklist(bool configValid, bool configSaved, bool printerInstalled, bool listenerRunning, bool testUploadOk)

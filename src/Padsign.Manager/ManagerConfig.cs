@@ -20,6 +20,12 @@ internal sealed class ManagerConfig
     public int RetryBackoffSeconds { get; set; } = 2;
     public bool CleanupOnSuccess { get; set; }
 
+    // ── Receive-back (signed PDF delivered back to this desktop) ──
+    public string SignedOutputPath { get; set; } = @"D:\VM\SignedDocs";
+    public bool ReceiveBackEnabled { get; set; } = true;
+    public int ReceiveBackPollSeconds { get; set; } = 5;
+    public int ReceiveBackTimeoutMinutes { get; set; } = 30;
+
     public static ManagerConfig Load(string path)
     {
         if (!File.Exists(path))

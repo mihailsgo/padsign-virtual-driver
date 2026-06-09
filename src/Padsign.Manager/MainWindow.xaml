@@ -89,6 +89,7 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -124,7 +125,14 @@
                                Foreground="#FF173F8A"
                                VerticalAlignment="Center" />
                 </Border>
-                <Button Grid.Column="4"
+                <Border Grid.Column="4" Margin="8,0,0,0" Padding="10,6" CornerRadius="14" Background="#FFF1F3F5" BorderBrush="#FFD0D8E2" BorderThickness="1">
+                    <TextBlock Name="ReceiveBackStatusChipText"
+                               Text="Receive-back: idle"
+                               FontWeight="SemiBold"
+                               Foreground="#FF516071"
+                               VerticalAlignment="Center" />
+                </Border>
+                <Button Grid.Column="5"
                         Content="?"
                         Margin="8,0,0,0"
                         VerticalAlignment="Center"
@@ -216,6 +224,10 @@
 
                                     <TextBlock Text="Working Directory" FontWeight="SemiBold" />
                                     <TextBox Name="WorkingDirectoryTextBox" TextChanged="FormFieldChanged" />
+
+                                    <TextBlock Text="Signed Output Folder" FontWeight="SemiBold" />
+                                    <TextBox Name="SignedOutputPathTextBox" TextChanged="FormFieldChanged" />
+                                    <TextBlock Name="SignedOutputPathErrorTextBlock" Style="{StaticResource ErrorTextStyle}" />
 
                                     <TextBlock Text="Upload Timeout Seconds" FontWeight="SemiBold" />
                                     <TextBox Name="UploadTimeoutTextBox" TextChanged="FormFieldChanged" />

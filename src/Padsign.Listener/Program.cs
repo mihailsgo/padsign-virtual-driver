@@ -33,7 +33,8 @@ internal static class Program
         logger.Info($"Padsign listener v{version} starting...");
         logger.Info($"Listening on TCP port {config.Port}, working dir: {config.WorkingDirectory}");
 
-        var processor = new JobProcessor(config, logger);
+        var receiver = new SignedPdfReceiver(config, logger);
+        var processor = new JobProcessor(config, logger, receiver);
         var server = new RawPrintServer(config, logger, processor);
 
         using var cts = new CancellationTokenSource();
@@ -46,6 +47,9 @@ internal static class Program
 
         try
         {
+            // Catch-up before accepting print jobs so the first user action does
+            // not race with delivery of documents signed while we were down.
+            await receiver.CatchUpAsync(cts.Token);
             await server.RunAsync(cts.Token);
         }
         catch (OperationCanceledException)
@@ -78,6 +82,12 @@ internal sealed record PadsignConfig
     public int RetryBackoffSeconds { get; init; } = 2;
     public bool CleanupOnSuccess { get; init; }
 
+    // ── Receive-back (signed PDF delivered back to this desktop) ──
+    public string SignedOutputPath { get; init; } = @"D:\VM\SignedDocs";
+    public bool ReceiveBackEnabled { get; init; } = true;
+    public int ReceiveBackPollSeconds { get; init; } = 5;
+    public int ReceiveBackTimeoutMinutes { get; init; } = 30;
+
     public static PadsignConfig Load(string path)
     {
         if (!File.Exists(path))
@@ -107,7 +117,10 @@ internal sealed record PadsignConfig
             AuthenticationHeaderValue = authHeaderValue.Trim(),
             Email = cfg.Email.Trim(),
             Company = cfg.Company.Trim(),
-            WorkingDirectory = ResolvePath(cfg.WorkingDirectory, AppContext.BaseDirectory)
+            WorkingDirectory = ResolvePath(cfg.WorkingDirectory, AppContext.BaseDirectory),
+            SignedOutputPath = string.IsNullOrWhiteSpace(cfg.SignedOutputPath) ? @"D:\VM\SignedDocs" : cfg.SignedOutputPath.Trim(),
+            ReceiveBackPollSeconds = Math.Max(1, cfg.ReceiveBackPollSeconds),
+            ReceiveBackTimeoutMinutes = Math.Max(1, cfg.ReceiveBackTimeoutMinutes)
         };
     }
 
@@ -178,11 +191,13 @@ internal sealed class JobProcessor
 {
     private readonly PadsignConfig _config;
     private readonly FileLogger _logger;
+    private readonly SignedPdfReceiver? _receiver;
 
-    public JobProcessor(PadsignConfig config, FileLogger logger)
+    public JobProcessor(PadsignConfig config, FileLogger logger, SignedPdfReceiver? receiver = null)
     {
         _config = config;
         _logger = logger;
+        _receiver = receiver;
         Directory.CreateDirectory(_config.WorkingDirectory);
     }
 
@@ -213,25 +228,30 @@ internal sealed class JobProcessor
         File.Copy(spoolPath, pdfPath, overwrite: true);
         _logger.Info($"Job {jobId}: input already PDF, upload request will be sent.");
 
-        await UploadWithRetryAsync(pdfPath, jobId, cancellationToken);
+        var docId = await UploadWithRetryAsync(pdfPath, jobId, cancellationToken);
 
         if (_config.CleanupOnSuccess)
         {
             TryDelete(spoolPath);
             TryDelete(pdfPath);
         }
+
+        // Kick off receive-back without blocking the print connection (it closes
+        // as soon as ProcessAsync returns). Each job polls for its own document.
+        if (_receiver != null)
+            _ = Task.Run(() => _receiver.PollAndFetchAsync(docId, jobId, cancellationToken), cancellationToken);
     }
 
-    private async Task UploadWithRetryAsync(string pdfPath, string jobId, CancellationToken cancellationToken)
+    private async Task<string?> UploadWithRetryAsync(string pdfPath, string jobId, CancellationToken cancellationToken)
     {
         var sessionCombo = $"{_config.Email}|{_config.Company}";
         for (var attempt = 1; attempt <= Math.Max(_config.MaxUploadRetries, 1); attempt++)
         {
             try
             {
-                await UploadOnceAsync(pdfPath, jobId, cancellationToken);
+                var docId = await UploadOnceAsync(pdfPath, jobId, cancellationToken);
                 _logger.Info($"Job {jobId}: upload successful for session {sessionCombo}.");
-                return;
+                return docId;
             }
             catch (Exception ex)
             {
@@ -244,9 +264,11 @@ internal sealed class JobProcessor
                 await Task.Delay(delay, cancellationToken);
             }
         }
+
+        return null;
     }
 
-    private async Task UploadOnceAsync(string pdfPath, string jobId, CancellationToken cancellationToken)
+    private async Task<string?> UploadOnceAsync(string pdfPath, string jobId, CancellationToken cancellationToken)
     {
         using var client = new HttpClient
         {
@@ -279,6 +301,16 @@ internal sealed class JobProcessor
         }
 
         _logger.Debug($"Job {jobId}: API response {response.StatusCode}: {Truncate(body, 500)}");
+
+        // The server returns { docId } from /registerPDF; hand it to receive-back.
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("docId", out var el))
+                return el.GetString();
+        }
+        catch { /* non-JSON body is not fatal */ }
+        return null;
     }
 
     private static async Task<long> CopyWithCountAsync(Stream source, Stream destination, CancellationToken cancellationToken)

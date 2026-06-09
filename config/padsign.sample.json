@@ -9,5 +9,9 @@
   "UploadTimeoutSeconds": 30,
   "MaxUploadRetries": 3,
   "RetryBackoffSeconds": 2,
-  "CleanupOnSuccess": false
+  "CleanupOnSuccess": false,
+  "SignedOutputPath": "D:\\VM\\SignedDocs",
+  "ReceiveBackEnabled": true,
+  "ReceiveBackPollSeconds": 5,
+  "ReceiveBackTimeoutMinutes": 30
 }

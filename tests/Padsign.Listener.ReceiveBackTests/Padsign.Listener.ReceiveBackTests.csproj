@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Padsign.Listener.ReceiveBackTests</AssemblyName>
+    <!-- Both files define a Main; pick ours explicitly. -->
+    <StartupObject>Padsign.Listener.Tests.TestRunner</StartupObject>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Compile the REAL listener source so the test exercises live code (stays in sync). -->
+    <Compile Include="..\..\src\Padsign.Listener\Program.cs" Link="Linked\Program.cs" />
+    <Compile Include="..\..\src\Padsign.Listener\SignedPdfReceiver.cs" Link="Linked\SignedPdfReceiver.cs" />
+  </ItemGroup>
+</Project>

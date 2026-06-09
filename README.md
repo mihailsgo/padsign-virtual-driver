@@ -53,6 +53,9 @@ flowchart LR
   C --> D{Payload is PDF?}
   D -- Yes --> E[POST /api/registerPDF with file + email + company]
   D -- No --> F[Log: document is not PDF; upload not sent]
+  E --> G[Poll GET /api/signedPdf/pending]
+  G --> H[Download GET /api/signedPdf?docid= and save to SignedOutputPath]
+  H --> I[POST /api/signedPdf/ack - server deletes its buffered copy]
 ```
 
 UI Map (What Client Sees)
@@ -61,6 +64,7 @@ UI Map (What Client Sees)
   - `Config: ...`
   - `Listener: Running/Stopped`
   - `Printer: Installed/Missing`
+  - `Receive-back: delivered/pending/failed/idle/off` (last signed-PDF return status; full reason in tooltip)
 - Tabs:
   - `Setup`: fill API/auth/session values and click `Save And Test PDF Sending`.
   - `Operations`: install/remove printer, start/stop listener, readiness checklist, command output.
@@ -82,6 +86,7 @@ Setup Tab
 - Right-side fields:
   - `RAW Port`
   - `Working Directory`
+  - `Signed Output Folder`
   - `Upload Timeout Seconds`
   - `Max Upload Retries`
   - `Retry Backoff Seconds`
@@ -187,10 +192,14 @@ Advanced Fields
 ---------------
 - `Port` (default `9100`)
 - `WorkingDirectory` (default `spool`)
+- `SignedOutputPath` (default `D:\VM\SignedDocs`)
 - `UploadTimeoutSeconds`
 - `MaxUploadRetries`
 - `RetryBackoffSeconds`
 - `CleanupOnSuccess`
+- `ReceiveBackEnabled` (default `true`)
+- `ReceiveBackPollSeconds` (default `5`)
+- `ReceiveBackTimeoutMinutes` (default `30`)
 
 Field Reference (Detailed)
 --------------------------
@@ -253,6 +262,35 @@ Field Reference (Detailed)
 - Why it matters:
   - ensure write permissions; invalid path may break job processing.
 
+`SignedOutputPath` (`Signed Output Folder`)
+- What it is:
+  - local folder where the signed PDF returned by the server is saved.
+- Default:
+  - `D:\VM\SignedDocs`.
+- Why it matters:
+  - created automatically if missing; the file is named by the server
+    (`<documentNumber>_<timestamp>.pdf`, taken from the `X-Padsign-Filename`
+    header). Must be a full/rooted, writable path (validated in the UI).
+
+`ReceiveBackEnabled`
+- What it is:
+  - master switch for pulling signed PDFs back to this desktop.
+- Default:
+  - `true`. Set `false` to disable receive-back entirely (config-file only).
+
+`ReceiveBackPollSeconds`
+- What it is:
+  - interval between `/signedPdf/pending` polls after an upload.
+- Default:
+  - `5`.
+
+`ReceiveBackTimeoutMinutes`
+- What it is:
+  - how long a per-job poll waits for its document before giving up (the doc is
+    still delivered later by startup catch-up).
+- Default:
+  - `30`.
+
 `UploadTimeoutSeconds`
 - What it is:
   - max wait time for one API request.
@@ -307,6 +345,10 @@ Runtime Behavior
   - listener logs: `document is not PDF. Upload request has not been made.`
 - Startup auto-test:
   - on launch, if configuration is valid and saved, the Manager automatically runs a connectivity test (upload + cleanup) and updates the readiness checklist.
+- Receive-back (signed PDF returns to this desktop):
+  - after a successful upload, the listener polls the server for the signed result, saves it to `SignedOutputPath` under the server-provided filename, then acknowledges delivery (which deletes the server's buffered copy).
+  - at listener startup, a one-time catch-up delivers any documents that were signed while the Manager was closed.
+  - status appears in the `Receive-back` header chip; per-step detail is in the listener log. A failed acknowledgement keeps the local file and retries later without re-downloading.
 
 Status and Readiness
 --------------------
@@ -337,6 +379,9 @@ Config and Logs
   - `<install folder>\listener\padsign.json`
 - Listener logs:
   - `<install folder>\listener\logs\padsign.log`
+- Receive-back state (in the listener working directory, default `<install folder>\listener\spool`):
+  - `receiveback-status.json` — last receive-back outcome shown in the Manager chip
+  - `received-pending-ack.json` — docs saved locally but not yet acknowledged (ack retried later)
 
 Build and Packaging (Internal)
 ------------------------------
