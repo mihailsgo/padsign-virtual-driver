@@ -49,6 +49,48 @@ Notes:
 - Admin rights are required for installation/printer operations.
 - Daily use (editing config, monitoring logs, testing API) is done from `Padsign Manager`.
 
+Upgrading From a Previous Version
+---------------------------------
+Installing a newer build over an existing one (for example `v1.1.0` → `v1.2.0`) is an
+in-place upgrade. Run the same `Padsign-Setup.cmd` as administrator and install to the
+**same folder** as before.
+
+What the installer does:
+- Stops the running `Padsign.Listener` and `Padsign.Manager` so their files can be replaced.
+- Overwrites the program binaries with the new version.
+- **Preserves your existing configuration.** Your settings live in
+  `%LOCALAPPDATA%\Padsign\padsign.json` (outside the install folder), so the installer never
+  touches them; an install-folder `config\padsign.json` is also kept if it already exists
+  (the sample is only seeded on a first install).
+- Re-registers the `Padsign` printer and relaunches the Manager.
+
+What happens to configuration:
+- All existing fields (API URL, auth, email, company, port, …) are read unchanged — the
+  print → upload flow is fully backward-compatible.
+- Fields introduced in a newer version that are missing from your old `padsign.json` take
+  their built-in defaults. For `v1.2.0` these are: `ReceiveBackEnabled = true`,
+  `SignedOutputPath = D:\VM\SignedDocs`, `ReceiveBackPollSeconds = 5`,
+  `ReceiveBackTimeoutMinutes = 30`. They are written into the file the next time you click
+  `Save And Test PDF Sending`.
+
+What changes in behavior after upgrading to `v1.2.0`:
+- **Receive-back is enabled by default.** The listener will poll the server for the signed
+  PDF after each upload (and once at startup). This is safe: if the server does not yet expose
+  the receive-back endpoints (older `ps-server`) or routing is off, the poll just logs and does
+  nothing — **printing and upload are unaffected**.
+- If the desktop has no `D:` drive, nothing happens until a document is actually returned; only
+  then is the save attempted and, if the folder cannot be created, the failure is logged and the
+  server keeps the file for retry (no crash). Set a real path in the Setup tab's
+  **Signed Output Folder** to avoid this.
+
+Recommended steps:
+1. Run `Padsign-Setup.cmd` as administrator → install to the same folder.
+2. Open `Padsign Manager`, confirm the title reads `Padsign Manager v1.2.0`.
+3. In the `Setup` tab, set **Signed Output Folder** to a real local path and click
+   `Save And Test PDF Sending` (this rewrites `padsign.json` with the new fields).
+4. To opt a desktop **out** of receive-back, set `"ReceiveBackEnabled": false` in
+   `%LOCALAPPDATA%\Padsign\padsign.json` (there is no UI toggle), then start the listener.
+
 Visual Architecture
 -------------------
 ```mermaid
