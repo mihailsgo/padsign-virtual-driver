@@ -83,6 +83,13 @@ What changes in behavior after upgrading to `v1.2.0`:
   server keeps the file for retry (no crash). Set a real path in the Setup tab's
   **Signed Output Folder** to avoid this.
 
+> **PadSign server 3.30 or newer:** receive-back (download + acknowledge) returns `404` for a
+> Manager that uses the shared `REGISTER_PDF_API_KEY`, because the server now checks who owns
+> each signed document. Printing is not affected. The fix needs no new Manager build: give the
+> company its own key on the server and put it into **Authentication Header Value**, right
+> after the server upgrade (not before). Details, version table and a rollout checklist:
+> [docs/padsign-server-compatibility.md](docs/padsign-server-compatibility.md).
+
 Recommended steps:
 1. Run `Padsign-Setup.cmd` as administrator → install to the same folder.
 2. Open `Padsign Manager`, confirm the title reads `Padsign Manager v1.2.0`.
