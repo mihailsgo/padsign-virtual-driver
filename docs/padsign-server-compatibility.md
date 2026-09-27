@@ -82,7 +82,7 @@ On the server (done by the TrustLynx operator):
 3. Leave the shared `REGISTER_PDF_API_KEY` in place until every desktop of every company has
    switched. Companies that haven't switched yet keep working exactly as before.
 
-The full server recipe is in psapp's `docs/document-routing-spec.md`, section *Migrating to
+The full server recipe is in psapp's `documentation/document-routing-spec.md`, section *Migrating to
 per-company keys*.
 
 On each desktop of that company:
